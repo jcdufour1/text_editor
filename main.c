@@ -25,6 +25,24 @@ typedef struct {
     STATE state;
 } Editor;
 
+static void* safe_malloc(size_t s) {
+    void* ptr = malloc(s);
+    if (!ptr) {
+        fprintf(stderr, "fetal error: could not allocate memory\n");
+        exit(1);
+    }
+    return ptr;
+}
+
+static void* safe_realloc(void* buf, size_t s) {
+    buf = realloc(buf, s);
+    if (!buf) {
+        fprintf(stderr, "fetal error: could not allocate memory\n");
+        exit(1);
+    }
+    return buf;
+}
+
 static bool Text_del(Editor* text, size_t index) {
     if (text->count < 1) {
         return false;
@@ -35,21 +53,28 @@ static bool Text_del(Editor* text, size_t index) {
     return true;
 }
 
-static void Text_append(Editor* text, int new_ch) {
+static void Text_insert(Editor* text, int new_ch, size_t index) {
+    assert(index <= text->count && "out of bounds");
     if (text->capacity < text->count + 1) {
         if (text->capacity == 0) {
             text->capacity = TEXT_DEFAULT_CAP;
-            text->str = malloc(text->capacity * sizeof(char));
+            text->str = safe_malloc(text->capacity * sizeof(char));
             memset(text->str, 0, text->capacity);
         } else {
             size_t text_prev_capacity = text->capacity;
             text->capacity = text->capacity * 2;
-            text->str = realloc(text->str, text->capacity * sizeof(char));
+            text->str = safe_realloc(text->str, text->capacity * sizeof(char));
             memset(text->str + text_prev_capacity, 0, text->capacity - text_prev_capacity);
         }
     }
-    text->str[text->count++] = new_ch;
+    memmove(text->str + index + 1, text->str + index, text->count - index);
+    text->str[index] = new_ch;
+    text->count++;
     text->cursor++;
+}
+
+static void Text_append(Editor* text, int new_ch) {
+    Text_insert(text, new_ch, text->count);
 }
 
 typedef enum {DIR_UP, DIR_DOWN, DIR_RIGHT, DIR_LEFT} DIRECTION;
@@ -194,7 +219,7 @@ void process_next_input(WINDOW* main_window, char* info_buf, Editor* text, bool*
         //mvwprintw(window, 0, 0, "%.*s\n", editor->count, editor->str);
         } break;
         case KEY_ENTER: {
-            Text_append(text, '\n'); // TODO: insert text before cursor, not always at end
+            Text_insert(text, '\n', text->cursor); // TODO: insert text before cursor, not always at end
         } break;
         case KEY_LEFT: {
             Text_move_cursor(text, DIR_LEFT);
@@ -214,7 +239,7 @@ void process_next_input(WINDOW* main_window, char* info_buf, Editor* text, bool*
             }
         } break;
         default: {
-            Text_append(text, new_ch); // TODO: insert text before cursor, not always at end
+            Text_insert(text, new_ch, text->cursor); // TODO: insert text before cursor, not always at end
         } break;
     } break;
     }
