@@ -43,7 +43,7 @@ static void* safe_realloc(void* buf, size_t s) {
     return buf;
 }
 
-static bool Text_del(Editor* text, size_t index) {
+static bool Editor_del(Editor* text, size_t index) {
     if (text->count < 1) {
         return false;
     }
@@ -53,7 +53,7 @@ static bool Text_del(Editor* text, size_t index) {
     return true;
 }
 
-static void Text_insert(Editor* text, int new_ch, size_t index) {
+static void Editor_insert(Editor* text, int new_ch, size_t index) {
     assert(index <= text->count && "out of bounds");
     if (text->capacity < text->count + 1) {
         if (text->capacity == 0) {
@@ -73,8 +73,8 @@ static void Text_insert(Editor* text, int new_ch, size_t index) {
     text->cursor++;
 }
 
-static void Text_append(Editor* text, int new_ch) {
-    Text_insert(text, new_ch, text->count);
+static void Editor_append(Editor* text, int new_ch) {
+    Editor_insert(text, new_ch, text->count);
 }
 
 typedef enum {DIR_UP, DIR_DOWN, DIR_RIGHT, DIR_LEFT} DIRECTION;
@@ -148,7 +148,7 @@ bool get_index_start_prev_line(size_t* result, const Editor* text, size_t curr_c
     return true;
 }
 
-void Text_move_cursor(Editor* text, DIRECTION direction) {
+void Editor_move_cursor(Editor* text, DIRECTION direction) {
     switch (direction) {
         case DIR_LEFT:
             text->cursor > 0 ? text->cursor-- : 0;
@@ -219,27 +219,27 @@ void process_next_input(WINDOW* main_window, char* info_buf, Editor* text, bool*
         //mvwprintw(window, 0, 0, "%.*s\n", editor->count, editor->str);
         } break;
         case KEY_ENTER: {
-            Text_insert(text, '\n', text->cursor); // TODO: insert text before cursor, not always at end
+            Editor_insert(text, '\n', text->cursor); // TODO: insert text before cursor, not always at end
         } break;
         case KEY_LEFT: {
-            Text_move_cursor(text, DIR_LEFT);
+            Editor_move_cursor(text, DIR_LEFT);
         } break;
         case KEY_RIGHT: {
-            Text_move_cursor(text, DIR_RIGHT);
+            Editor_move_cursor(text, DIR_RIGHT);
         } break;
         case KEY_UP: {
-            Text_move_cursor(text, DIR_UP);
+            Editor_move_cursor(text, DIR_UP);
         } break;
         case KEY_DOWN: {
-            Text_move_cursor(text, DIR_DOWN);
+            Editor_move_cursor(text, DIR_DOWN);
         } break;
         case KEY_BACKSPACE: {
             if (text->cursor > 0) {
-                Text_del(text, text->cursor - 1);
+                Editor_del(text, text->cursor - 1);
             }
         } break;
         default: {
-            Text_insert(text, new_ch, text->cursor); // TODO: insert text before cursor, not always at end
+            Editor_insert(text, new_ch, text->cursor); // TODO: insert text before cursor, not always at end
         } break;
     } break;
     }
@@ -288,7 +288,7 @@ void parse_args(Editor* text, int argc, char** argv) {
         } else {
             int curr_char = getc(f);
             while (!feof(f)) {
-                Text_append(text, curr_char);
+                Editor_append(text, curr_char);
                 curr_char = getc(f);
             }
             fclose(f);
