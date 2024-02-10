@@ -7,6 +7,8 @@
 #include <assert.h>
 #include <unistd.h>
 
+// TODO: fix bug with cursor up/down jumping two lines when a line only contains a newline
+
 #define INFO_HEIGHT 4
 
 #define TEXT_DEFAULT_CAP 512
@@ -59,7 +61,6 @@ static size_t len_curr_line(const Editor* text, size_t curr_cursor) {
 static size_t get_index_start_next_line(size_t* result, const Editor* text, size_t curr_cursor) {
     fprintf(stderr, "get_index_start_next_line before: curr_cursor: %zu\n", curr_cursor);
     assert(curr_cursor <= text->count);
-    curr_cursor++;
     if (curr_cursor >= text->count) {
         return false;
     }
@@ -72,9 +73,6 @@ static size_t get_index_start_next_line(size_t* result, const Editor* text, size
             found_next_line = true;
             break;
         }
-        //if (curr_cursor + 1 >= text->count) { // at end of file
-        //    assert(false && "unreachable");
-        //}
     }
 
     fprintf(stderr, "get_index_start_next_line after: curr_cursor: %zu\n", curr_cursor);
@@ -97,30 +95,30 @@ static size_t get_index_start_curr_line(const Editor* text, size_t curr_cursor) 
 
 static bool get_index_start_prev_line(size_t* result, const Editor* text, size_t curr_cursor) {
     curr_cursor = get_index_start_curr_line(text, curr_cursor);
+    fprintf(stderr, "start get_index_start_prev_line(): from get_index_start_curr_line: curr_cursor: %zu\n", curr_cursor);
     if (curr_cursor < 2) {
         *result = get_index_start_curr_line(text, curr_cursor);
         return false;
+        //assert(false && "not implemented");
+    }
+
+    // end_prev_line is equal to the index of newline at end of prev line
+    size_t end_prev_line = curr_cursor - 1;
+
+    if (text->str[end_prev_line] == '\r') {
+        assert(false && "not implemented");
+        //end_prev_line--;
+    }
+
+    if (end_prev_line < 1) {
         assert(false && "not implemented");
     }
 
-    curr_cursor--;
-
-    if (text->str[curr_cursor] == '\r') {
-        assert(false && "not implemented");
-        curr_cursor--;
-    }
-
-    if (curr_cursor < 1) {
+    if (text->str[end_prev_line] != '\n') {
         assert(false && "not implemented");
     }
 
-    if (text->str[curr_cursor] == '\n') {
-        curr_cursor--;
-    } else {
-        assert(false && "not implemented");
-    }
-
-    *result = get_index_start_curr_line(text, curr_cursor);
+    *result = get_index_start_curr_line(text, end_prev_line);
     return true;
 }
 
