@@ -8,15 +8,20 @@
 
 #define TEXT_DEFAULT_CAP 512
 
+#define ctrl(x)           ((x) & 0x1f)
+
+typedef enum {STATE_INSERT = 0, STATE_COMMAND} STATE;
+
 typedef struct {
     char* str;
     size_t capacity;
     size_t count;
     size_t cursor;
-    size_t user_max_col;
-} Text;
+    size_t user_max_col; // TODO: increment this when user types?
+    STATE state;
+} Editor;
 
-static bool Text_del(Text* text, size_t index) {
+static bool Text_del(Editor* text, size_t index) {
     if (text->count < 1) {
         return false;
     }
@@ -26,7 +31,7 @@ static bool Text_del(Text* text, size_t index) {
     return true;
 }
 
-static void Text_append(Text* text, int new_ch) {
+static void Text_append(Editor* text, int new_ch) {
     if (text->capacity < text->count + 1) {
         if (text->capacity == 0) {
             text->capacity = TEXT_DEFAULT_CAP;
@@ -44,7 +49,8 @@ static void Text_append(Text* text, int new_ch) {
 }
 
 typedef enum {DIR_UP, DIR_DOWN, DIR_RIGHT, DIR_LEFT} DIRECTION;
-size_t len_curr_line(const Text* text, size_t curr_cursor) {
+
+size_t len_curr_line(const Editor* text, size_t curr_cursor) {
     size_t initial_cursor = curr_cursor;
     for (; curr_cursor < text->count && text->str[curr_cursor] != '\n'; curr_cursor++) {
         if (curr_cursor + 1 >= text->count) {
@@ -55,7 +61,7 @@ size_t len_curr_line(const Text* text, size_t curr_cursor) {
     return curr_cursor - initial_cursor;
 }
 
-size_t get_index_start_next_line(size_t* result, const Text* text, size_t curr_cursor) {
+size_t get_index_start_next_line(size_t* result, const Editor* text, size_t curr_cursor) {
     fprintf(stderr, "get_index_start_next_line before: curr_cursor: %zu\n", curr_cursor);
     assert(curr_cursor <= text->count);
     curr_cursor++;
@@ -77,14 +83,14 @@ size_t get_index_start_next_line(size_t* result, const Text* text, size_t curr_c
     return true;
 }
 
-size_t get_index_start_curr_line(const Text* text, size_t curr_cursor) {
+size_t get_index_start_curr_line(const Editor* text, size_t curr_cursor) {
     for (; curr_cursor > 0 && text->str[curr_cursor - 1] != '\n'; curr_cursor--);
     return curr_cursor;
 }
 
 #define MIN(lhs, rhs) ((lhs) < (rhs) ? (lhs) : (rhs))
 
-bool get_index_start_prev_line(size_t* result, const Text* text, size_t curr_cursor) {
+bool get_index_start_prev_line(size_t* result, const Editor* text, size_t curr_cursor) {
     curr_cursor = get_index_start_curr_line(text, curr_cursor);
     if (curr_cursor < 2) {
         *result = get_index_start_curr_line(text, curr_cursor);
@@ -113,7 +119,7 @@ bool get_index_start_prev_line(size_t* result, const Text* text, size_t curr_cur
     return true;
 }
 
-void Text_move_cursor(Text* text, DIRECTION direction) {
+void Text_move_cursor(Editor* text, DIRECTION direction) {
     switch (direction) {
         case DIR_LEFT:
             text->cursor > 0 ? text->cursor-- : 0;
@@ -168,28 +174,76 @@ void Text_move_cursor(Text* text, DIRECTION direction) {
     }
 }
 
-void process_next_input(Text* text, bool* should_close) {
-    int new_ch = getch();
-    if ('q' == new_ch) {
-        *should_close = true;
-    } else if (KEY_LEFT == new_ch) {
-        Text_move_cursor(text, DIR_LEFT);
-    } else if (KEY_RIGHT == new_ch) {
-        Text_move_cursor(text, DIR_RIGHT);
-    } else if (KEY_UP == new_ch) {
-        Text_move_cursor(text, DIR_UP);
-    } else if (KEY_DOWN == new_ch) {
-        Text_move_cursor(text, DIR_DOWN);
-    } else if (KEY_BACKSPACE == new_ch) {
-        if (text->cursor > 0) {
-            Text_del(text, text->cursor - 1);
-        }
-    } else {
-        Text_append(text, new_ch);
+void process_next_input(WINDOW* window, Editor* text, bool* should_close) {
+    (void) window;
+    switch (text->state) {
+    case STATE_INSERT: {
+        int new_ch = getch();
+        switch (new_ch) {
+        //case ':': {
+        //    text->state = STATE_COMMAND;
+        //} break;
+        case ctrl('i'): {
+            text->state = STATE_COMMAND;
+        } break;
+        case KEY_ENTER: {
+            Text_append(text, '\n');
+        } break;
+        case KEY_LEFT: {
+            Text_move_cursor(text, DIR_LEFT);
+        } break;
+        case KEY_RIGHT: {
+            Text_move_cursor(text, DIR_RIGHT);
+        } break;
+        case KEY_UP: {
+            Text_move_cursor(text, DIR_UP);
+        } break;
+        case KEY_DOWN: {
+            Text_move_cursor(text, DIR_DOWN);
+        } break;
+        case KEY_BACKSPACE: {
+            if (text->cursor > 0) {
+                Text_del(text, text->cursor - 1);
+            }
+        } break;
+        default: {
+            Text_append(text, new_ch);
+        } break;
+    } break;
     }
+    case STATE_COMMAND: {
+        int new_ch = getch();
+        switch (new_ch) {
+        case 'q': {
+            *should_close = true;
+        } break;
+        case ctrl('i'): {
+            text->state = STATE_INSERT;
+        } break;
+        case KEY_BACKSPACE: {
+            text->state = STATE_INSERT;
+        } break;
+        case 27: {
+            //nodelay(window, true);
+            //
+            fprintf(stderr, "warning: keys with escape sequence (unimplemented) pressed in command mode\n");
+            //if (-1 == getch()) { /* esc */
+            //    text->state = STATE_INSERT;
+            //} else {
+            //    fprintf(stderr, "warning: alt key (unimplemented) pressed in command mode\n");
+            //}
+            //nodelay(window, false);
+        } break;
+        default: {
+            fprintf(stderr, "warning: unsupported key pressed in command mode\n");
+        } break;
+        }
+    } break;
+    }
+                       
 }
 
-void parse_args(Text* text, int argc, char** argv) {
+void parse_args(Editor* text, int argc, char** argv) {
     int curr_arg_idx = 1;
     if (curr_arg_idx > 2) {
         assert(false && "not implemented");
@@ -209,7 +263,7 @@ void parse_args(Text* text, int argc, char** argv) {
     }
 }
 
-void draw_cursor(const Text* text) {
+void draw_cursor(const Editor* text) {
     size_t cursor_x = 0;
     size_t cursor_y = 0;
     for (size_t idx = 0; idx < text->cursor; idx++) {
@@ -224,16 +278,19 @@ void draw_cursor(const Text* text) {
 }
 
 int main(int argc, char** argv) {
-    Text text;
-    memset(&text, 0, sizeof(Text));
+    Editor text;
+    memset(&text, 0, sizeof(Editor));
 
+    //set_escdelay(100);
     parse_args(&text, argc, argv);
 
     initscr();
-
-    raw();				/* Line buffering disabled	*/
 	keypad(stdscr, TRUE);		/* We get F1, F2 etc..		*/
+    cbreak();
+    //raw();				/* Line buffering disabled	*/
+    // WINDOW* == stdscr
 	noecho();			/* Don't echo() while we do getch */
+    nl();
 
     bool should_close = false;
     while (!should_close) {
@@ -242,7 +299,7 @@ int main(int argc, char** argv) {
             printw("%.*s\n", text.count, text.str);
         }
         draw_cursor(&text);
-        process_next_input(&text, &should_close);
+        process_next_input(stdscr, &text, &should_close);
         assert(text.cursor < text.count + 1);
         refresh();
     }
