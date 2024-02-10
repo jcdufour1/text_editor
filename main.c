@@ -187,7 +187,7 @@ void process_next_input(WINDOW* window, Editor* text, bool* should_close) {
             text->state = STATE_COMMAND;
         } break;
         case KEY_ENTER: {
-            Text_append(text, '\n');
+            Text_append(text, '\n'); // TODO: insert text before cursor, not always at end
         } break;
         case KEY_LEFT: {
             Text_move_cursor(text, DIR_LEFT);
@@ -207,7 +207,7 @@ void process_next_input(WINDOW* window, Editor* text, bool* should_close) {
             }
         } break;
         default: {
-            Text_append(text, new_ch);
+            Text_append(text, new_ch); // TODO: insert text before cursor, not always at end
         } break;
     } break;
     }
@@ -263,7 +263,7 @@ void parse_args(Editor* text, int argc, char** argv) {
     }
 }
 
-void draw_cursor(const Editor* text) {
+void draw_cursor(WINDOW* window, const Editor* text) {
     size_t cursor_x = 0;
     size_t cursor_y = 0;
     for (size_t idx = 0; idx < text->cursor; idx++) {
@@ -274,15 +274,34 @@ void draw_cursor(const Editor* text) {
             cursor_x++;
         }
     }
-    move(cursor_y, cursor_x);
+    wmove(window, cursor_y, cursor_x);
+}
+
+bool Editor_init(Editor* editor) {
+    memset(editor, 0, sizeof(Editor));
+    return true;
+}
+
+void Editor_free(Editor* editor) {
+    free(editor->str);
+}
+
+void draw_main_window(WINDOW* window, const Editor* editor) {
+    if (editor->str) {
+        wprintw(window, "%.*s\n", editor->count, editor->str);
+    }
+    draw_cursor(window, editor);
 }
 
 int main(int argc, char** argv) {
-    Editor text;
-    memset(&text, 0, sizeof(Editor));
+    Editor editor;
+    if (!Editor_init(&editor)) {
+        fprintf(stderr, "fetal error: could not initialize editor\n");
+        exit(1);
+    }
 
     //set_escdelay(100);
-    parse_args(&text, argc, argv);
+    parse_args(&editor, argc, argv);
 
     initscr();
 	keypad(stdscr, TRUE);		/* We get F1, F2 etc..		*/
@@ -295,17 +314,14 @@ int main(int argc, char** argv) {
     bool should_close = false;
     while (!should_close) {
         erase();
-        if (text.str) {
-            printw("%.*s\n", text.count, text.str);
-        }
-        draw_cursor(&text);
-        process_next_input(stdscr, &text, &should_close);
-        assert(text.cursor < text.count + 1);
+        draw_main_window(stdscr, &editor);
+        process_next_input(stdscr, &editor, &should_close);
+        assert(editor.cursor < editor.count + 1);
         refresh();
     }
     endwin();
 
-    free(text.str);
+    Editor_free(&editor);
 
     return 0;
 }
