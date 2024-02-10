@@ -7,6 +7,8 @@
 #include <assert.h>
 #include <unistd.h>
 
+#define INFO_HEIGHT 4
+
 #define TEXT_DEFAULT_CAP 512
 
 #define ctrl(x)           ((x) & 0x1f)
@@ -216,14 +218,45 @@ static void Editor_move_cursor(Editor* text, DIRECTION direction) {
     }
 }
 
-static void process_next_input(WINDOW* main_window, char* info_buf, Editor* text, bool* should_close) {
+typedef struct {
+    int total_height;
+    int total_width;
+
+    WINDOW* main_window;
+    int main_height;
+    int main_width;
+
+    WINDOW* info_window;
+    int info_height;
+    int info_width;
+    char info_buf[1024];
+} Windows;
+
+static void Windows_do_resize(Windows* windows) {
+    getmaxyx(stdscr, windows->total_height, windows->total_width);
+
+    windows->main_height = windows->total_height - INFO_HEIGHT - 1;
+    windows->main_width = windows->total_width;
+
+    windows->info_height = INFO_HEIGHT;
+    windows->info_width = windows->total_width;
+
+    wresize(windows->main_window, windows->main_height, windows->main_width);
+    wresize(windows->info_window, windows->info_height, windows->info_width);
+    mvwin(windows->info_window, windows->main_height, 0);
+}
+
+static void process_next_input(Windows* windows, Editor* text, bool* should_close) {
     switch (text->state) {
     case STATE_INSERT: {
-        int new_ch = wgetch(main_window);
+        int new_ch = wgetch(windows->main_window);
         switch (new_ch) {
+        case KEY_RESIZE: {
+            Windows_do_resize(windows);
+        } break;
         case ctrl('i'): {
             text->state = STATE_COMMAND;
-            strcpy(info_buf, command_text);
+            strcpy(windows->info_buf, command_text);
         } break;
         case KEY_ENTER: {
             Editor_insert(text, '\n', text->cursor);
@@ -251,14 +284,17 @@ static void process_next_input(WINDOW* main_window, char* info_buf, Editor* text
     } break;
     }
     case STATE_COMMAND: {
-        int new_ch = wgetch(main_window);
+        int new_ch = wgetch(windows->main_window);
         switch (new_ch) {
+        case KEY_RESIZE: {
+            Windows_do_resize(windows);
+        } break;
         case 'q': {
             *should_close = true;
         } break;
         case ctrl('i'): {
             text->state = STATE_INSERT;
-            strcpy(info_buf, insert_text);
+            strcpy(windows->info_buf, insert_text);
         } break;
         case KEY_BACKSPACE: {
             text->state = STATE_INSERT;
@@ -355,14 +391,12 @@ static WINDOW* get_newwin(int height, int width, int starty, int startx) {
     return new_window;
 }
 
-#define INFO_HEIGHT 4
-
-static char info_buf[1024];
-
 int main(int argc, char** argv) {
-    memset(info_buf, 0, sizeof(info_buf) / sizeof(info_buf[0]));
-
     Editor editor;
+    Windows* windows = safe_malloc(sizeof(*windows));
+    assert(sizeof(*windows) == sizeof(Windows));
+    memset(windows, 0, sizeof(*windows));
+
     if (!Editor_init(&editor)) {
         fprintf(stderr, "fetal error: could not initialize editor\n");
         exit(1);
@@ -380,35 +414,38 @@ int main(int argc, char** argv) {
     nl();
     refresh();
 
-    int total_width = getmaxx(stdscr);
-    int total_height = getmaxy(stdscr);
+    getmaxyx(stdscr, windows->total_height, windows->total_width);
 
-    assert(total_height > INFO_HEIGHT);
-    WINDOW* main_window = get_newwin(total_height - INFO_HEIGHT - 1, total_width, 0, 0);
-    if (!main_window) {
+    windows->main_height = windows->total_height - INFO_HEIGHT - 1;
+    windows->main_width = windows->total_width;
+    assert(windows->total_height > INFO_HEIGHT);
+    windows->info_height = INFO_HEIGHT;
+    windows->info_width = windows->total_width;
+    windows->main_window = get_newwin(windows->main_height, windows->main_width, 0, 0);
+    if (!windows->main_window) {
         fprintf(stderr, "fetal error: could not initialize main window\n");
         exit(1);
     }
 
-    WINDOW* info_window = get_newwin(INFO_HEIGHT, total_width, 40, 0);
+    windows->info_window = get_newwin(windows->info_height, windows->total_width, 40, 0);
 
-    strcpy(info_buf, insert_text);
+    strcpy(windows->info_buf, insert_text);
 
     bool should_close = false;
     while (!should_close) {
         // draw
             // erase();
         clear();
-        draw_main_window(main_window, &editor);
-        draw_info_window(info_window, info_buf, strlen(info_buf));
-        wrefresh(main_window);
-        wrefresh(info_window);
+        draw_main_window(windows->main_window, &editor);
+        draw_info_window(windows->info_window, windows->info_buf, strlen(windows->info_buf));
+        wrefresh(windows->main_window);
+        wrefresh(windows->info_window);
 
         // position and draw cursor
-        draw_cursor(main_window, &editor);
+        draw_cursor(windows->main_window, &editor);
 
         // get and process next keystroke
-        process_next_input(main_window, info_buf, &editor, &should_close);
+        process_next_input(windows, &editor, &should_close);
         assert(editor.cursor < editor.count + 1);
     }
     endwin();
