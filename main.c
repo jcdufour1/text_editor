@@ -5,6 +5,7 @@
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
+#include <unistd.h>
 
 #define TEXT_DEFAULT_CAP 512
 
@@ -175,10 +176,9 @@ void Text_move_cursor(Editor* text, DIRECTION direction) {
 }
 
 void process_next_input(WINDOW* window, Editor* text, bool* should_close) {
-    (void) window;
     switch (text->state) {
     case STATE_INSERT: {
-        int new_ch = getch();
+        int new_ch = wgetch(window);
         switch (new_ch) {
         //case ':': {
         //    text->state = STATE_COMMAND;
@@ -212,7 +212,7 @@ void process_next_input(WINDOW* window, Editor* text, bool* should_close) {
     } break;
     }
     case STATE_COMMAND: {
-        int new_ch = getch();
+        int new_ch = wgetch(window);
         switch (new_ch) {
         case 'q': {
             *should_close = true;
@@ -288,7 +288,7 @@ void Editor_free(Editor* editor) {
 
 void draw_main_window(WINDOW* window, const Editor* editor) {
     if (editor->str) {
-        wprintw(window, "%.*s\n", editor->count, editor->str);
+        mvwprintw(window, 0, 0, "%.*s\n", editor->count, editor->str);
     }
     draw_cursor(window, editor);
 }
@@ -310,14 +310,26 @@ int main(int argc, char** argv) {
     // WINDOW* == stdscr
 	noecho();			/* Don't echo() while we do getch */
     nl();
+    refresh();
+
+    WINDOW* main_window = newwin(20, 30, 30, 30);
+	keypad(main_window, TRUE);		/* We get F1, F2 etc..		*/
+    if (!main_window) {
+        fprintf(stderr, "fetal error: could not initialize main window\n");
+        exit(1);
+    }
+    box(main_window, 1, 1);
+    wrefresh(main_window);
+
 
     bool should_close = false;
     while (!should_close) {
-        erase();
-        draw_main_window(stdscr, &editor);
-        process_next_input(stdscr, &editor, &should_close);
+        //erase();
+        clear();
+        draw_main_window(main_window, &editor);
+        process_next_input(main_window, &editor, &should_close);
         assert(editor.cursor < editor.count + 1);
-        refresh();
+        wrefresh(main_window);
     }
     endwin();
 
