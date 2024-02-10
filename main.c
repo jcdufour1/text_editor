@@ -14,14 +14,14 @@
 typedef enum {STATE_INSERT = 0, STATE_COMMAND} STATE;
 
 static const char* insert_text = "[insert]: press ctrl-I to enter command mode or exit";
-static const char* command_text = "press q to quit. press ctrl-I to go back to insert mode";
+static const char* command_text = "[command]: press q to quit. press ctrl-I to go back to insert mode";
 
 typedef struct {
     char* str;
     size_t capacity;
     size_t count;
     size_t cursor;
-    size_t user_max_col; // TODO: increment this when user types?
+    size_t user_max_col;
     STATE state;
 } Editor;
 
@@ -43,43 +43,7 @@ static void* safe_realloc(void* buf, size_t s) {
     return buf;
 }
 
-static bool Editor_del(Editor* text, size_t index) {
-    if (text->count < 1) {
-        return false;
-    }
-    memmove(text->str + index, text->str + index + 1, text->count - index - 1);
-    text->count--;
-    text->cursor--;
-    return true;
-}
-
-static void Editor_insert(Editor* text, int new_ch, size_t index) {
-    assert(index <= text->count && "out of bounds");
-    if (text->capacity < text->count + 1) {
-        if (text->capacity == 0) {
-            text->capacity = TEXT_DEFAULT_CAP;
-            text->str = safe_malloc(text->capacity * sizeof(char));
-            memset(text->str, 0, text->capacity);
-        } else {
-            size_t text_prev_capacity = text->capacity;
-            text->capacity = text->capacity * 2;
-            text->str = safe_realloc(text->str, text->capacity * sizeof(char));
-            memset(text->str + text_prev_capacity, 0, text->capacity - text_prev_capacity);
-        }
-    }
-    memmove(text->str + index + 1, text->str + index, text->count - index);
-    text->str[index] = new_ch;
-    text->count++;
-    text->cursor++;
-}
-
-static void Editor_append(Editor* text, int new_ch) {
-    Editor_insert(text, new_ch, text->count);
-}
-
-typedef enum {DIR_UP, DIR_DOWN, DIR_RIGHT, DIR_LEFT} DIRECTION;
-
-size_t len_curr_line(const Editor* text, size_t curr_cursor) {
+static size_t len_curr_line(const Editor* text, size_t curr_cursor) {
     size_t initial_cursor = curr_cursor;
     for (; curr_cursor < text->count && text->str[curr_cursor] != '\n'; curr_cursor++) {
         if (curr_cursor + 1 >= text->count) {
@@ -90,7 +54,7 @@ size_t len_curr_line(const Editor* text, size_t curr_cursor) {
     return curr_cursor - initial_cursor;
 }
 
-size_t get_index_start_next_line(size_t* result, const Editor* text, size_t curr_cursor) {
+static size_t get_index_start_next_line(size_t* result, const Editor* text, size_t curr_cursor) {
     fprintf(stderr, "get_index_start_next_line before: curr_cursor: %zu\n", curr_cursor);
     assert(curr_cursor <= text->count);
     curr_cursor++;
@@ -98,28 +62,38 @@ size_t get_index_start_next_line(size_t* result, const Editor* text, size_t curr
         return false;
     }
 
-    for (; curr_cursor < text->count && text->str[curr_cursor - 1] != '\n'; curr_cursor++) {
+    bool found_next_line = false;
+
+    while (curr_cursor++ < text->count) {
         fprintf(stderr, "get_index_start_next_line during: curr_cursor: %zu\n", curr_cursor);
-        if (curr_cursor + 1 >= text->count) {
-            // at end of file
-            return false;
+        if (text->str[curr_cursor - 1] == '\n') {
+            found_next_line = true;
+            break;
         }
+        //if (curr_cursor + 1 >= text->count) { // at end of file
+        //    assert(false && "unreachable");
+        //}
     }
 
     fprintf(stderr, "get_index_start_next_line after: curr_cursor: %zu\n", curr_cursor);
 
     *result = curr_cursor;
-    return true;
+    return found_next_line;
 }
 
-size_t get_index_start_curr_line(const Editor* text, size_t curr_cursor) {
-    for (; curr_cursor > 0 && text->str[curr_cursor - 1] != '\n'; curr_cursor--);
+static size_t get_index_start_curr_line(const Editor* text, size_t curr_cursor) {
+    while(curr_cursor > 0) {
+        if (text->str[curr_cursor - 1] == '\n') {
+            break;
+        }
+        curr_cursor--;
+    }
     return curr_cursor;
 }
 
 #define MIN(lhs, rhs) ((lhs) < (rhs) ? (lhs) : (rhs))
 
-bool get_index_start_prev_line(size_t* result, const Editor* text, size_t curr_cursor) {
+static bool get_index_start_prev_line(size_t* result, const Editor* text, size_t curr_cursor) {
     curr_cursor = get_index_start_curr_line(text, curr_cursor);
     if (curr_cursor < 2) {
         *result = get_index_start_curr_line(text, curr_cursor);
@@ -148,7 +122,46 @@ bool get_index_start_prev_line(size_t* result, const Editor* text, size_t curr_c
     return true;
 }
 
-void Editor_move_cursor(Editor* text, DIRECTION direction) {
+
+static bool Editor_del(Editor* text, size_t index) {
+    if (text->count < 1) {
+        return false;
+    }
+    memmove(text->str + index, text->str + index + 1, text->count - index - 1);
+    text->count--;
+    text->cursor--;
+    text->user_max_col = text->cursor - get_index_start_curr_line(text, text->cursor);
+    return true;
+}
+
+static void Editor_insert(Editor* text, int new_ch, size_t index) {
+    assert(index <= text->count && "out of bounds");
+    if (text->capacity < text->count + 1) {
+        if (text->capacity == 0) {
+            text->capacity = TEXT_DEFAULT_CAP;
+            text->str = safe_malloc(text->capacity * sizeof(char));
+            memset(text->str, 0, text->capacity);
+        } else {
+            size_t text_prev_capacity = text->capacity;
+            text->capacity = text->capacity * 2;
+            text->str = safe_realloc(text->str, text->capacity * sizeof(char));
+            memset(text->str + text_prev_capacity, 0, text->capacity - text_prev_capacity);
+        }
+    }
+    memmove(text->str + index + 1, text->str + index, text->count - index);
+    text->str[index] = new_ch;
+    text->count++;
+    text->cursor++;
+    text->user_max_col = text->cursor - get_index_start_curr_line(text, text->cursor);
+}
+
+static void Editor_append(Editor* text, int new_ch) {
+    Editor_insert(text, new_ch, text->count);
+}
+
+typedef enum {DIR_UP, DIR_DOWN, DIR_RIGHT, DIR_LEFT} DIRECTION;
+
+static void Editor_move_cursor(Editor* text, DIRECTION direction) {
     switch (direction) {
         case DIR_LEFT:
             text->cursor > 0 ? text->cursor-- : 0;
@@ -203,23 +216,17 @@ void Editor_move_cursor(Editor* text, DIRECTION direction) {
     }
 }
 
-void process_next_input(WINDOW* main_window, char* info_buf, Editor* text, bool* should_close) {
+static void process_next_input(WINDOW* main_window, char* info_buf, Editor* text, bool* should_close) {
     switch (text->state) {
     case STATE_INSERT: {
         int new_ch = wgetch(main_window);
         switch (new_ch) {
-        //case ':': {
-        //    text->state = STATE_COMMAND;
-        //} break;
         case ctrl('i'): {
             text->state = STATE_COMMAND;
             strcpy(info_buf, command_text);
-            //const char* msg = "test";
-            //mvwprintw(info_window, 0, 0, "%.*s\n", strlen(msg), msg);
-        //mvwprintw(window, 0, 0, "%.*s\n", editor->count, editor->str);
         } break;
         case KEY_ENTER: {
-            Editor_insert(text, '\n', text->cursor); // TODO: insert text before cursor, not always at end
+            Editor_insert(text, '\n', text->cursor);
         } break;
         case KEY_LEFT: {
             Editor_move_cursor(text, DIR_LEFT);
@@ -239,7 +246,7 @@ void process_next_input(WINDOW* main_window, char* info_buf, Editor* text, bool*
             }
         } break;
         default: {
-            Editor_insert(text, new_ch, text->cursor); // TODO: insert text before cursor, not always at end
+            Editor_insert(text, new_ch, text->cursor);
         } break;
     } break;
     }
@@ -276,7 +283,7 @@ void process_next_input(WINDOW* main_window, char* info_buf, Editor* text, bool*
                        
 }
 
-void parse_args(Editor* text, int argc, char** argv) {
+static void parse_args(Editor* text, int argc, char** argv) {
     int curr_arg_idx = 1;
     if (curr_arg_idx > 2) {
         assert(false && "not implemented");
@@ -296,43 +303,48 @@ void parse_args(Editor* text, int argc, char** argv) {
     }
 }
 
-void draw_cursor(WINDOW* window, const Editor* text) {
-    size_t cursor_x = 0;
-    size_t cursor_y = 0;
-    // TODO: should positioning be done elsewhere?
-    for (size_t idx = 0; idx < text->cursor; idx++) {
-        if (text->str[idx] == '\n') {
-            cursor_y++;
-            cursor_x = 0;
+static void Editor_get_xy_end(size_t* x, size_t* y, const Editor* editor) {
+    *x = 0;
+    *y = 0;
+    for (size_t idx = 0; idx < editor->cursor; idx++) {
+        if (editor->str[idx] == '\n') {
+            (*y)++;
+            *x = 0;
         } else {
-            cursor_x++;
+            (*x)++;
         }
     }
+}
+
+static void draw_cursor(WINDOW* window, const Editor* editor) {
+    size_t cursor_x;
+    size_t cursor_y;
+    Editor_get_xy_end(&cursor_x, &cursor_y, editor);
     wmove(window, cursor_y, cursor_x);
 }
 
-bool Editor_init(Editor* editor) {
+static bool Editor_init(Editor* editor) {
     memset(editor, 0, sizeof(Editor));
     return true;
 }
 
-void Editor_free(Editor* editor) {
+static void Editor_free(Editor* editor) {
     free(editor->str);
 }
 
-void draw_main_window(WINDOW* window, const Editor* editor) {
+static void draw_main_window(WINDOW* window, const Editor* editor) {
     if (editor->str) {
         mvwprintw(window, 0, 0, "%.*s\n", editor->count, editor->str);
     }
 }
 
-void draw_info_window(WINDOW* window, const char* message, size_t message_len) {
+static void draw_info_window(WINDOW* window, const char* message, size_t message_len) {
     //const char* msg = "test2";
     mvwprintw(window, 0, 0, "%.*s\n", message_len, message);
     //mvwprintw(window, 0, 0, "test3");
 }
 
-WINDOW* get_newwin(int height, int width, int starty, int startx) {
+static WINDOW* get_newwin(int height, int width, int starty, int startx) {
     WINDOW* new_window = newwin(height, width, starty, startx);
     if (!new_window) {
         assert(false && "not implemented");
@@ -395,7 +407,7 @@ int main(int argc, char** argv) {
         // position and draw cursor
         draw_cursor(main_window, &editor);
 
-        // get next keystroke
+        // get and process next keystroke
         process_next_input(main_window, info_buf, &editor, &should_close);
         assert(editor.cursor < editor.count + 1);
     }
