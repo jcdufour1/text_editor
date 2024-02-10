@@ -13,6 +13,9 @@
 
 typedef enum {STATE_INSERT = 0, STATE_COMMAND} STATE;
 
+static const char* insert_text = "[insert]: press ctrl-I to enter command mode or exit";
+static const char* command_text = "press q to quit. press ctrl-I to go back to insert mode";
+
 typedef struct {
     char* str;
     size_t capacity;
@@ -175,16 +178,20 @@ void Text_move_cursor(Editor* text, DIRECTION direction) {
     }
 }
 
-void process_next_input(WINDOW* window, Editor* text, bool* should_close) {
+void process_next_input(WINDOW* main_window, char* info_buf, Editor* text, bool* should_close) {
     switch (text->state) {
     case STATE_INSERT: {
-        int new_ch = wgetch(window);
+        int new_ch = wgetch(main_window);
         switch (new_ch) {
         //case ':': {
         //    text->state = STATE_COMMAND;
         //} break;
         case ctrl('i'): {
             text->state = STATE_COMMAND;
+            strcpy(info_buf, command_text);
+            //const char* msg = "test";
+            //mvwprintw(info_window, 0, 0, "%.*s\n", strlen(msg), msg);
+        //mvwprintw(window, 0, 0, "%.*s\n", editor->count, editor->str);
         } break;
         case KEY_ENTER: {
             Text_append(text, '\n'); // TODO: insert text before cursor, not always at end
@@ -212,13 +219,14 @@ void process_next_input(WINDOW* window, Editor* text, bool* should_close) {
     } break;
     }
     case STATE_COMMAND: {
-        int new_ch = wgetch(window);
+        int new_ch = wgetch(main_window);
         switch (new_ch) {
         case 'q': {
             *should_close = true;
         } break;
         case ctrl('i'): {
             text->state = STATE_INSERT;
+            strcpy(info_buf, insert_text);
         } break;
         case KEY_BACKSPACE: {
             text->state = STATE_INSERT;
@@ -266,6 +274,7 @@ void parse_args(Editor* text, int argc, char** argv) {
 void draw_cursor(WINDOW* window, const Editor* text) {
     size_t cursor_x = 0;
     size_t cursor_y = 0;
+    // TODO: should positioning be done elsewhere?
     for (size_t idx = 0; idx < text->cursor; idx++) {
         if (text->str[idx] == '\n') {
             cursor_y++;
@@ -290,10 +299,32 @@ void draw_main_window(WINDOW* window, const Editor* editor) {
     if (editor->str) {
         mvwprintw(window, 0, 0, "%.*s\n", editor->count, editor->str);
     }
-    draw_cursor(window, editor);
 }
 
+void draw_info_window(WINDOW* window, const char* message, size_t message_len) {
+    //const char* msg = "test2";
+    mvwprintw(window, 0, 0, "%.*s\n", message_len, message);
+    //mvwprintw(window, 0, 0, "test3");
+}
+
+WINDOW* get_newwin(int height, int width, int starty, int startx) {
+    WINDOW* new_window = newwin(height, width, starty, startx);
+    if (!new_window) {
+        assert(false && "not implemented");
+    }
+	keypad(new_window, TRUE);		/* We get F1, F2 etc..		*/
+    box(new_window, 1, 1);
+    wrefresh(new_window);
+    return new_window;
+}
+
+#define INFO_HEIGHT 4
+
+static char info_buf[1024];
+
 int main(int argc, char** argv) {
+    memset(info_buf, 0, sizeof(info_buf) / sizeof(info_buf[0]));
+
     Editor editor;
     if (!Editor_init(&editor)) {
         fprintf(stderr, "fetal error: could not initialize editor\n");
@@ -312,24 +343,36 @@ int main(int argc, char** argv) {
     nl();
     refresh();
 
-    WINDOW* main_window = newwin(20, 30, 30, 30);
-	keypad(main_window, TRUE);		/* We get F1, F2 etc..		*/
+    int total_width = getmaxx(stdscr);
+    int total_height = getmaxy(stdscr);
+
+    assert(total_height > INFO_HEIGHT);
+    WINDOW* main_window = get_newwin(total_height - INFO_HEIGHT - 1, total_width, 0, 0);
     if (!main_window) {
         fprintf(stderr, "fetal error: could not initialize main window\n");
         exit(1);
     }
-    box(main_window, 1, 1);
-    wrefresh(main_window);
 
+    WINDOW* info_window = get_newwin(INFO_HEIGHT, total_width, 40, 0);
+
+    strcpy(info_buf, insert_text);
 
     bool should_close = false;
     while (!should_close) {
-        //erase();
+        // draw
+            // erase();
         clear();
         draw_main_window(main_window, &editor);
-        process_next_input(main_window, &editor, &should_close);
-        assert(editor.cursor < editor.count + 1);
+        draw_info_window(info_window, info_buf, strlen(info_buf));
         wrefresh(main_window);
+        wrefresh(info_window);
+
+        // position and draw cursor
+        draw_cursor(main_window, &editor);
+
+        // get next keystroke
+        process_next_input(main_window, info_buf, &editor, &should_close);
+        assert(editor.cursor < editor.count + 1);
     }
     endwin();
 
