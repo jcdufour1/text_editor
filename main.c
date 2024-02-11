@@ -456,9 +456,10 @@ static void parse_args(Editor* editor, int argc, char** argv) {
     editor->unsaved_changes = false;
     const char* no_changes_text = "no changes";
     String_cpy_from_cstr(&editor->save_info, no_changes_text, strlen(no_changes_text));
+    editor->cursor = 0;
 }
 
-static void Editor_get_xy_end(size_t* x, size_t* y, const Editor* editor) {
+static void Editor_get_xy_at_cursor(size_t* x, size_t* y, const Editor* editor) {
     *x = 0;
     *y = 0;
     for (size_t idx = 0; idx < editor->cursor; idx++) {
@@ -471,10 +472,14 @@ static void Editor_get_xy_end(size_t* x, size_t* y, const Editor* editor) {
     }
 }
 
-static void draw_cursor(WINDOW* window, const Editor* editor) {
+static void draw_cursor(WINDOW* window, size_t window_height, size_t window_width, const Editor* editor) {
     size_t cursor_x;
     size_t cursor_y;
-    Editor_get_xy_end(&cursor_x, &cursor_y, editor);
+    Editor_get_xy_at_cursor(&cursor_x, &cursor_y, editor);
+    assert(window_width >= 1);
+    assert(window_height >= 1);
+    assert(cursor_x < window_width);
+    assert(cursor_y < window_height);
     wmove(window, cursor_y, cursor_x);
 }
 
@@ -557,22 +562,21 @@ int main(int argc, char** argv) {
         exit(1);
     }
 
-    windows->info_window = get_newwin(windows->info_height, windows->total_width, 40, 0);
+    windows->info_window = get_newwin(windows->info_height, windows->info_width, windows->main_height, 0);
 
-    String_cpy_from_cstr(&windows->info_buf_general, command_text, strlen(command_text));
+    String_cpy_from_cstr(&windows->info_buf_general, insert_text, strlen(insert_text));
 
     bool should_close = false;
     while (!should_close) {
         // draw
-            // erase();
-        clear();
+        clear();    // erase();
         draw_main_window(windows->main_window, &editor);
         draw_info_window(windows->info_window, windows->info_buf_general, editor.save_info);
         wrefresh(windows->main_window);
         wrefresh(windows->info_window);
 
         // position and draw cursor
-        draw_cursor(windows->main_window, &editor);
+        draw_cursor(windows->main_window, windows->main_height, windows->main_width, &editor);
 
         // get and process next keystroke
         process_next_input(windows, &editor, &should_close);
