@@ -92,6 +92,8 @@ static void String_cpy_from_cstr(String* dest, const char* src, size_t src_size)
 typedef struct {
     String file_text;
     size_t cursor;
+    size_t scroll_x;
+    size_t scroll_y;
     size_t user_max_col;
     STATE state;
 
@@ -110,8 +112,8 @@ static size_t len_curr_line(const Editor* editor, size_t curr_cursor) {
     return curr_cursor - initial_cursor;
 }
 
-static size_t get_index_start_next_line(size_t* result, const Editor* text, size_t curr_cursor) {
-    fprintf(stderr, "get_index_start_next_line before: curr_cursor: %zu\n", curr_cursor);
+static bool get_index_start_next_line(size_t* result, const Editor* text, size_t curr_cursor) {
+    //fprintf(stderr, "get_index_start_next_line before: curr_cursor: %zu\n", curr_cursor);
     assert(curr_cursor <= text->file_text.count);
     if (curr_cursor >= text->file_text.count) {
         return false;
@@ -120,14 +122,14 @@ static size_t get_index_start_next_line(size_t* result, const Editor* text, size
     bool found_next_line = false;
 
     while (curr_cursor++ < text->file_text.count) {
-        fprintf(stderr, "get_index_start_next_line during: curr_cursor: %zu\n", curr_cursor);
+        //fprintf(stderr, "get_index_start_next_line during: curr_cursor: %zu\n", curr_cursor);
         if (text->file_text.str[curr_cursor - 1] == '\n') {
             found_next_line = true;
             break;
         }
     }
 
-    fprintf(stderr, "get_index_start_next_line after: curr_cursor: %zu\n", curr_cursor);
+    //fprintf(stderr, "get_index_start_next_line after: curr_cursor: %zu\n", curr_cursor);
 
     *result = curr_cursor;
     return found_next_line;
@@ -435,6 +437,131 @@ static void process_next_input(Windows* windows, Editor* editor, bool* should_cl
     }
 }
 
+static void Editor_get_index_scroll_offset(size_t* index, const Editor* editor) {
+    if (editor->scroll_x > 0) {
+        assert(false && "not implemented");
+    }
+
+    *index = 0;
+    for (size_t curr_y = 0; curr_y < editor->scroll_y; curr_y++) {
+        if (!get_index_start_next_line(index, editor, *index)) {
+            assert(false);
+        }
+        (*index)++;
+    }
+
+    fprintf(stderr, "end Editor_get_index_scroll_offset(%zu) result: %zu\n", editor->scroll_y, *index);
+}
+
+static void Editor_get_xy_at_cursor(size_t* x, size_t* y, const Editor* editor) {
+    if (editor->scroll_x > 0) {
+        assert(false && "not implemented");
+    }
+
+    size_t scroll_offset;
+    Editor_get_index_scroll_offset(&scroll_offset, editor);
+    fprintf(stderr, "in Editor_get_xy_at_cursor: Editor_get_index_scroll_offset() result: %zu\n", scroll_offset);
+    *x = 0;
+    *y = 0;
+    for (size_t idx = scroll_offset; idx < editor->cursor; idx++) {
+        if (editor->file_text.str[idx] == '\r') {
+            assert(false && "not implemented");
+        }
+
+        if (editor->file_text.str[idx] == '\n') {
+            (*y)++;
+            *x = 0;
+        } else {
+            (*x)++;
+        }
+    }
+}
+
+static void Editor_scroll_if_nessessary(Editor* editor, size_t main_window_height, size_t main_window_width) {
+    size_t cursor_x;
+    size_t cursor_y;
+    Editor_get_xy_at_cursor(&cursor_x, &cursor_y, editor);
+
+    if (cursor_y >= main_window_height) {
+        fprintf(stderr, "Editor_scroll_if_nessessary(): main_window_height: %zu\n", main_window_height);
+        fprintf(stderr, "Editor_scroll_if_nessessary(): cursor_y: %zu\n", cursor_y);
+        editor->scroll_y += cursor_y - main_window_height + 1;
+    }
+
+    if (cursor_x >= main_window_width) {
+        assert(false && "not implemented");
+    }
+}
+
+static void draw_cursor(WINDOW* window, size_t window_height, size_t window_width, const Editor* editor) {
+    if (editor->scroll_x > 0) {
+        assert(false && "not implemented");
+    }
+
+    size_t cursor_x;
+    size_t cursor_y;
+    Editor_get_xy_at_cursor(&cursor_x, &cursor_y, editor);
+    fprintf(stderr, "draw_cursor: cursor_y: %zu\n", cursor_y);
+    fprintf(stderr, "draw_scroll: scroll_y: %zu\n", editor->scroll_y);
+    assert(window_width >= 1);
+    assert(window_height >= 1);
+    assert(cursor_x < window_width);
+    assert(cursor_y < window_height);
+    wmove(window, cursor_y, cursor_x);
+}
+
+static bool Editor_init(Editor* editor) {
+    memset(editor, 0, sizeof(Editor));
+    return true;
+}
+
+static void Editor_free(Editor* editor) {
+    free(editor->file_text.str);
+}
+
+static void draw_main_window(WINDOW* window, const Editor* editor) {
+    if (editor->scroll_x > 0) {
+        assert(false && "not implemented");
+    }
+
+    size_t index;
+    Editor_get_index_scroll_offset(&index, editor);
+
+    if (editor->file_text.count > 0) {
+        mvwprintw(window, 0, 0, "%.*s\n", editor->file_text.count, editor->file_text.str + index);
+    }
+}
+
+static void draw_info_window(WINDOW* info_window, String info_general, String info_save) {
+    mvwprintw(info_window, 0, 0, "%.*s\n%.*s\n", info_general.count, info_general.str, info_save.count, info_save.str);
+}
+
+static WINDOW* get_newwin(int height, int width, int starty, int startx) {
+    WINDOW* new_window = newwin(height, width, starty, startx);
+    if (!new_window) {
+        assert(false && "not implemented");
+    }
+	keypad(new_window, TRUE);		/* We get F1, F2 etc..		*/
+    box(new_window, 1, 1);
+    wrefresh(new_window);
+    return new_window;
+}
+
+static void Windows_free(Windows* windows) {
+    if (!windows) {
+        return;
+    }
+
+    delwin(windows->info_window);
+    delwin(windows->main_window);
+
+    free(windows);
+}
+
+static void Windows_init(Windows* windows) {
+    memset(windows, 0, sizeof(*windows));
+}
+
 static void parse_args(Editor* editor, int argc, char** argv) {
     int curr_arg_idx = 1;
     if (curr_arg_idx > 2) {
@@ -457,74 +584,6 @@ static void parse_args(Editor* editor, int argc, char** argv) {
     const char* no_changes_text = "no changes";
     String_cpy_from_cstr(&editor->save_info, no_changes_text, strlen(no_changes_text));
     editor->cursor = 0;
-}
-
-static void Editor_get_xy_at_cursor(size_t* x, size_t* y, const Editor* editor) {
-    *x = 0;
-    *y = 0;
-    for (size_t idx = 0; idx < editor->cursor; idx++) {
-        if (editor->file_text.str[idx] == '\n') {
-            (*y)++;
-            *x = 0;
-        } else {
-            (*x)++;
-        }
-    }
-}
-
-static void draw_cursor(WINDOW* window, size_t window_height, size_t window_width, const Editor* editor) {
-    size_t cursor_x;
-    size_t cursor_y;
-    Editor_get_xy_at_cursor(&cursor_x, &cursor_y, editor);
-    assert(window_width >= 1);
-    assert(window_height >= 1);
-    assert(cursor_x < window_width);
-    assert(cursor_y < window_height);
-    wmove(window, cursor_y, cursor_x);
-}
-
-static bool Editor_init(Editor* editor) {
-    memset(editor, 0, sizeof(Editor));
-    return true;
-}
-
-static void Editor_free(Editor* editor) {
-    free(editor->file_text.str);
-}
-
-static void draw_main_window(WINDOW* window, const Editor* editor) {
-    if (editor->file_text.count > 0) {
-        mvwprintw(window, 0, 0, "%.*s\n", editor->file_text.count, editor->file_text.str);
-    }
-}
-
-static void draw_info_window(WINDOW* info_window, String info_general, String info_save) {
-    mvwprintw(info_window, 0, 0, "%.*s\n%.*s\n", info_general.count, info_general.str, info_save.count, info_save.str);
-}
-
-static WINDOW* get_newwin(int height, int width, int starty, int startx) {
-    WINDOW* new_window = newwin(height, width, starty, startx);
-    if (!new_window) {
-        assert(false && "not implemented");
-    }
-	keypad(new_window, TRUE);		/* We get F1, F2 etc..		*/
-    box(new_window, 1, 1);
-    wrefresh(new_window);
-    return new_window;
-}
-static void Windows_free(Windows* windows) {
-    if (!windows) {
-        return;
-    }
-
-    delwin(windows->info_window);
-    delwin(windows->main_window);
-
-    free(windows);
-}
-
-static void Windows_init(Windows* windows) {
-    memset(windows, 0, sizeof(*windows));
 }
 
 int main(int argc, char** argv) {
@@ -568,6 +627,9 @@ int main(int argc, char** argv) {
 
     bool should_close = false;
     while (!should_close) {
+        // scroll if nessessary
+        Editor_scroll_if_nessessary(&editor, windows->main_height, windows->main_width);
+
         // draw
         clear();    // erase();
         draw_main_window(windows->main_window, &editor);
