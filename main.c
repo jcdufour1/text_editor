@@ -244,8 +244,37 @@ static void Windows_do_resize(Windows* windows) {
     mvwin(windows->info_window, windows->main_height, 0);
 }
 
-static void process_next_input(Windows* windows, Editor* text, bool* should_close) {
-    switch (text->state) {
+static bool save_file(const Editor* editor) {
+    const char* temp_file_name = "temp_thingy.txt";
+    FILE* temp_file = fopen(temp_file_name, "wb");
+    if (!temp_file) {
+        assert(false && "not implemented");
+        //return false;
+    }
+
+    // write temp file
+    ssize_t total_amount_written = 0;
+    ssize_t amount_written;
+    do {
+        amount_written = fwrite(editor->str + total_amount_written, 1, editor->count, temp_file);
+        total_amount_written += amount_written;
+        if (amount_written < 1) {
+            fprintf(stderr, "error: file %s could not be written: errno: %d: %s\n", "(not implemented)", errno, strerror(errno));
+            return false;
+        }
+    } while(total_amount_written < (ssize_t)editor->count);
+
+    // copy from temp to actual file destination
+    if (0 > rename(temp_file_name, "hello.txt")) {
+        fprintf(stderr, "error: file %s could not be written: errno: %d: %s\n", "(not implemented)", errno, strerror(errno));
+    }
+
+    return true;
+
+}
+
+static void process_next_input(Windows* windows, Editor* editor, bool* should_close) {
+    switch (editor->state) {
     case STATE_INSERT: {
         int new_ch = wgetch(windows->main_window);
         switch (new_ch) {
@@ -253,31 +282,38 @@ static void process_next_input(Windows* windows, Editor* text, bool* should_clos
             Windows_do_resize(windows);
         } break;
         case ctrl('i'): {
-            text->state = STATE_COMMAND;
+            editor->state = STATE_COMMAND;
             strcpy(windows->info_buf, command_text);
         } break;
+        case ctrl('s'): {
+            if (!save_file(editor)) {
+                strcpy(windows->info_buf, "error: file could not be saved");
+            } else {
+                strcpy(windows->info_buf, "file saved");
+            }
+        } break;
         case KEY_ENTER: {
-            Editor_insert(text, '\n', text->cursor);
+            Editor_insert(editor, '\n', editor->cursor);
         } break;
         case KEY_LEFT: {
-            Editor_move_cursor(text, DIR_LEFT);
+            Editor_move_cursor(editor, DIR_LEFT);
         } break;
         case KEY_RIGHT: {
-            Editor_move_cursor(text, DIR_RIGHT);
+            Editor_move_cursor(editor, DIR_RIGHT);
         } break;
         case KEY_UP: {
-            Editor_move_cursor(text, DIR_UP);
+            Editor_move_cursor(editor, DIR_UP);
         } break;
         case KEY_DOWN: {
-            Editor_move_cursor(text, DIR_DOWN);
+            Editor_move_cursor(editor, DIR_DOWN);
         } break;
         case KEY_BACKSPACE: {
-            if (text->cursor > 0) {
-                Editor_del(text, text->cursor - 1);
+            if (editor->cursor > 0) {
+                Editor_del(editor, editor->cursor - 1);
             }
         } break;
         default: {
-            Editor_insert(text, new_ch, text->cursor);
+            Editor_insert(editor, new_ch, editor->cursor);
         } break;
     } break;
     }
@@ -291,11 +327,18 @@ static void process_next_input(Windows* windows, Editor* text, bool* should_clos
             *should_close = true;
         } break;
         case ctrl('i'): {
-            text->state = STATE_INSERT;
+            editor->state = STATE_INSERT;
             strcpy(windows->info_buf, insert_text);
         } break;
+        case ctrl('s'): {
+            if (!save_file(editor)) {
+                strcpy(windows->info_buf, "error: file could not be saved");
+            } else {
+                strcpy(windows->info_buf, "file saved");
+            }
+        } break;
         case KEY_BACKSPACE: {
-            text->state = STATE_INSERT;
+            editor->state = STATE_INSERT;
         } break;
         case 27: {
             //nodelay(window, true);
@@ -405,8 +448,8 @@ int main(int argc, char** argv) {
 
     initscr();
 	keypad(stdscr, TRUE);		/* We get F1, F2 etc..		*/
-    cbreak();
-    //raw();				/* Line buffering disabled	*/
+    //cbreak();
+    raw();				/* Line buffering disabled	*/
     // WINDOW* == stdscr
 	noecho();			/* Don't echo() while we do getch */
     nl();
