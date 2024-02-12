@@ -99,6 +99,7 @@ typedef struct {
 
     bool unsaved_changes;
     String save_info;
+    const char* file_name;
 } Editor;
 
 static size_t len_curr_line(const Editor* editor, size_t curr_cursor) {
@@ -150,7 +151,7 @@ static size_t get_index_start_curr_line(const Editor* text, size_t curr_cursor) 
 static bool get_index_start_prev_line(size_t* result, const Editor* text, size_t curr_cursor) {
     curr_cursor = get_index_start_curr_line(text, curr_cursor);
     fprintf(stderr, "start get_index_start_prev_line(): from get_index_start_curr_line: curr_cursor: %zu\n", curr_cursor);
-    if (curr_cursor < 2) {
+    if (curr_cursor < 1) {
         *result = get_index_start_curr_line(text, curr_cursor);
         return false;
         //assert(false && "not implemented");
@@ -297,11 +298,13 @@ static void Windows_do_resize(Windows* windows) {
 }
 
 static bool save_file(const Editor* editor) {
-    const char* temp_file_name = "temp_thingy.txt";
+    // TODO: confirm that temp_file_name does not already exist
+    const char* temp_file_name = "temp_thingyksdjfaijdfkj.txt";
     FILE* temp_file = fopen(temp_file_name, "wb");
     if (!temp_file) {
         assert(false && "not implemented");
         //return false;
+        exit(1);
     }
 
     // write temp file
@@ -317,7 +320,7 @@ static bool save_file(const Editor* editor) {
     } while(total_amount_written < (ssize_t)editor->file_text.count);
 
     // copy from temp to actual file destination
-    if (0 > rename(temp_file_name, "hello.txt")) {
+    if (0 > rename(temp_file_name, editor->file_name)) {
         fprintf(stderr, "error: file %s could not be written: errno: %d: %s\n", "(not implemented)", errno, strerror(errno));
     }
 
@@ -578,6 +581,7 @@ static void parse_args(Editor* editor, int argc, char** argv) {
                 curr_char = getc(f);
             }
             fclose(f);
+            editor->file_name = argv[curr_arg_idx];
         }
     }
     editor->unsaved_changes = false;
