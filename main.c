@@ -11,6 +11,7 @@
 
 // TODO: add undo/redo
 // TODO: add search
+// TODO: fix issue of scroll sometimes scrolling two lines instead of one
 
 #define INFO_HEIGHT 4
 
@@ -18,10 +19,11 @@
 
 #define ctrl(x)           ((x) & 0x1f)
 
-typedef enum {STATE_INSERT = 0, STATE_COMMAND, STATE_QUIT_CONFIRM} STATE;
+typedef enum {STATE_INSERT = 0, STATE_COMMAND, STATE_SEARCH, STATE_QUIT_CONFIRM} STATE;
 
 static const char* insert_text = "[insert]: press ctrl-I to enter command mode or exit";
 static const char* command_text = "[command]: press q to quit. press ctrl-I to go back to insert mode";
+static const char* search_text = "[search]: ";
 static const char* quit_confirm_text = "Are you sure that you want to exit without saving? N/y";
 
 
@@ -51,6 +53,7 @@ typedef struct {
 
 //static void String_resize_if_nessessary(
 static void String_insert(String* string, char new_ch, size_t index) {
+    assert(index <= string->count);
     if (string->capacity < string->count + 1) {
         if (string->capacity == 0) {
             string->capacity = TEXT_DEFAULT_CAP;
@@ -85,7 +88,7 @@ static void String_cpy_from_cstr(String* dest, const char* src, size_t src_size)
     }
     assert(dest->capacity >= dest->count + src_size);
 
-    strncpy(dest->str, src, src_size);
+    memmove(dest->str, src, src_size);
     dest->count = src_size;
 }
 
@@ -100,6 +103,10 @@ typedef struct {
     bool unsaved_changes;
     String save_info;
     const char* file_name;
+    
+    String search_query;
+    String info_buf_general;
+    size_t search_cursor;
 } Editor;
 
 static size_t len_curr_line(const Editor* editor, size_t curr_cursor) {
@@ -173,6 +180,13 @@ static bool get_index_start_prev_line(size_t* result, const Editor* text, size_t
     return true;
 }
 
+static bool String_del(String* string, size_t index) {
+    fprintf(stderr, "String_del: index: %zu    string->count: %zu\n", index, string->count);
+    assert(index < string->count);
+    memmove(string->str + index, string->str + index + 1, string->count - index - 1);
+    string->count--;
+    return true;
+}
 
 static bool Editor_del(Editor* editor, size_t index) {
     if (editor->file_text.count < 1) {
@@ -185,11 +199,10 @@ static bool Editor_del(Editor* editor, size_t index) {
         editor->unsaved_changes = true;
     }
 
-    memmove(editor->file_text.str + index, editor->file_text.str + index + 1, editor->file_text.count - index - 1);
-    editor->file_text.count--;
     editor->cursor--;
     editor->user_max_col = editor->cursor - get_index_start_curr_line(editor, editor->cursor);
-    return true;
+
+    return String_del(&editor->file_text, index);
 }
 
 static void Editor_insert(Editor* editor, int new_ch, size_t index) {
@@ -210,6 +223,10 @@ static void Editor_insert(Editor* editor, int new_ch, size_t index) {
 
 static void Editor_append(Editor* text, int new_ch) {
     Editor_insert(text, new_ch, text->file_text.count);
+}
+
+static void String_append(String* string, int new_ch) {
+    String_insert(string, new_ch, string->count);
 }
 
 typedef enum {DIR_UP, DIR_DOWN, DIR_RIGHT, DIR_LEFT} DIRECTION;
@@ -280,7 +297,6 @@ typedef struct {
     WINDOW* info_window;
     int info_height;
     int info_width;
-    String info_buf_general;
 } Windows;
 
 static void Windows_do_resize(Windows* windows) {
@@ -343,6 +359,34 @@ static void Editor_save(Editor* editor) {
     editor->unsaved_changes = false;
 }
 
+static void Editor_search_insert(Editor* editor, int new_ch, size_t index) {
+    assert(index <= editor->search_query.count);
+    String_insert(&editor->search_query, new_ch, index);
+    editor->search_cursor++;
+}
+
+//static void Editor_search_append(Editor* editor, int new_ch) {
+    //assert(false && "not implemented");
+    //Editor_search_insert(editor, new_ch, editor->search_query.count - 1);
+//}
+
+static void String_pop(String* string) {
+    String_del(string, string->count - 1);
+}
+
+static bool Editor_search_del(Editor* editor, size_t index) {
+    if (editor->search_query.count < 1) {
+        return false;
+    }
+
+    editor->search_cursor--;
+    return String_del(&editor->search_query, index);
+}
+
+static void Editor_search_pop(Editor* editor) {
+    String_pop(&editor->search_query);
+}
+
 static void process_next_input(Windows* windows, Editor* editor, bool* should_close) {
     switch (editor->state) {
     case STATE_INSERT: {
@@ -353,7 +397,11 @@ static void process_next_input(Windows* windows, Editor* editor, bool* should_cl
         } break;
         case ctrl('i'): {
             editor->state = STATE_COMMAND;
-            String_cpy_from_cstr(&windows->info_buf_general, command_text, strlen(command_text));
+            String_cpy_from_cstr(&editor->info_buf_general, command_text, strlen(command_text));
+        } break;
+        case ctrl('f'): {
+            editor->state = STATE_SEARCH;
+            String_cpy_from_cstr(&editor->info_buf_general, search_text, strlen(search_text));
         } break;
         case ctrl('s'): {
             Editor_save(editor);
@@ -383,6 +431,53 @@ static void process_next_input(Windows* windows, Editor* editor, bool* should_cl
         } break;
     } break;
     }
+    case STATE_SEARCH: {
+        int new_ch = wgetch(windows->main_window);
+        switch (new_ch) {
+        case KEY_RESIZE: {
+            Windows_do_resize(windows);
+        } break;
+        case ctrl('i'): {
+            assert(false && "not implemented");
+        } break;
+        case ctrl('f'): {
+        } break;
+        case ctrl('s'): {
+            assert(false && "not implemented");
+            //Editor_save(editor);
+        } break;
+        case KEY_ENTER: {
+            assert(false && "not implemented");
+            //Editor_search_enter(editor, '\n', editor->cursor);
+        } break;
+        case KEY_LEFT: {
+            assert(false && "not implemented");
+        } break;
+        case KEY_RIGHT: {
+            assert(false && "not implemented");
+        } break;
+        case KEY_UP: {
+            assert(false && "not implemented");
+        } break;
+        case KEY_DOWN: {
+            assert(false && "not implemented");
+        } break;
+        case KEY_BACKSPACE: {
+            if (editor->search_cursor > 0) {
+                if (Editor_search_del(editor, editor->search_cursor - 1)) {
+                    fprintf(stderr, "returning from Editor_search_del: success\n");
+                } else {
+                    fprintf(stderr, "returning from Editor_search_del: failure\n");
+                }
+            } else {
+                fprintf(stderr, "editor->search_cursor: %zu\n", editor->search_cursor);
+            }
+        } break;
+        default: {
+            Editor_search_insert(editor, new_ch, editor->search_cursor);
+        } break;
+        }
+    } break;
     case STATE_COMMAND: {
         int new_ch = wgetch(windows->main_window);
         switch (new_ch) {
@@ -392,14 +487,14 @@ static void process_next_input(Windows* windows, Editor* editor, bool* should_cl
         case 'q': {
             if (editor->unsaved_changes) {
                 editor->state = STATE_QUIT_CONFIRM;
-                String_cpy_from_cstr(&windows->info_buf_general, quit_confirm_text, strlen(quit_confirm_text));
+                String_cpy_from_cstr(&editor->info_buf_general, quit_confirm_text, strlen(quit_confirm_text));
             } else {
                 *should_close = true;
             }
         } break;
         case ctrl('i'): {
             editor->state = STATE_INSERT;
-            String_cpy_from_cstr(&windows->info_buf_general, insert_text, strlen(insert_text));
+            String_cpy_from_cstr(&editor->info_buf_general, insert_text, strlen(insert_text));
         } break;
         case 'w':   // fallthrough
         case 's':   // fallthrough
@@ -434,7 +529,7 @@ static void process_next_input(Windows* windows, Editor* editor, bool* should_cl
         } break;
         default:
             editor->state = STATE_INSERT;
-            String_cpy_from_cstr(&windows->info_buf_general, insert_text, strlen(insert_text));
+            String_cpy_from_cstr(&editor->info_buf_general, insert_text, strlen(insert_text));
         } break;
     } break;
     }
@@ -535,8 +630,19 @@ static void draw_main_window(WINDOW* window, const Editor* editor) {
     }
 }
 
-static void draw_info_window(WINDOW* info_window, String info_general, String info_save) {
-    mvwprintw(info_window, 0, 0, "%.*s\n%.*s\n", info_general.count, info_general.str, info_save.count, info_save.str);
+static void draw_info_window(WINDOW* info_window, String info_general, String info_save, String search_query) {
+    mvwprintw(
+        info_window,
+        0,
+        0,
+        "%.*s\n%.*s\n%.*s\n",
+        info_general.count,
+        info_general.str,
+        info_save.count,
+        info_save.str,
+        search_query.count,
+        search_query.str
+    );
 }
 
 static WINDOW* get_newwin(int height, int width, int starty, int startx) {
@@ -627,7 +733,7 @@ int main(int argc, char** argv) {
 
     windows->info_window = get_newwin(windows->info_height, windows->info_width, windows->main_height, 0);
 
-    String_cpy_from_cstr(&windows->info_buf_general, insert_text, strlen(insert_text));
+    String_cpy_from_cstr(&editor.info_buf_general, insert_text, strlen(insert_text));
 
     bool should_close = false;
     while (!should_close) {
@@ -636,8 +742,10 @@ int main(int argc, char** argv) {
 
         // draw
         clear();    // erase();
+        fprintf(stderr, "editor.info_buf_general.str: %s\n", editor.info_buf_general.str);
+        
         draw_main_window(windows->main_window, &editor);
-        draw_info_window(windows->info_window, windows->info_buf_general, editor.save_info);
+        draw_info_window(windows->info_window, editor.info_buf_general, editor.save_info, editor.search_query);
         wrefresh(windows->main_window);
         wrefresh(windows->info_window);
 
