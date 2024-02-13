@@ -16,6 +16,10 @@
 
 typedef enum {STATE_INSERT = 0, STATE_COMMAND, STATE_SEARCH, STATE_QUIT_CONFIRM} STATE;
 
+typedef enum {DIR_UP, DIR_DOWN, DIR_RIGHT, DIR_LEFT} DIRECTION;
+
+typedef enum {SEARCH_FIRST, SEARCH_REPEAT} SEARCH_STATUS;
+
 static const char* insert_text = "[insert]: press ctrl-I to enter command mode or exit";
 static const char* command_text = "[command]: press q to quit. press ctrl-I to go back to insert mode";
 static const char* search_text = "[search]: ";
@@ -38,6 +42,7 @@ typedef struct {
     Text_box search_query;
     Text_box general_info;
     STATE state;
+    SEARCH_STATUS search_status;
 } Editor;
 
 static size_t len_curr_line(const Text_box* text, size_t curr_cursor) {
@@ -132,8 +137,6 @@ static void Text_box_insert(Text_box* text_box, int new_ch, size_t index) {
 static void Text_box_append(Text_box* text, int new_ch) {
     Text_box_insert(text, new_ch, text->str.count);
 }
-
-typedef enum {DIR_UP, DIR_DOWN, DIR_RIGHT, DIR_LEFT} DIRECTION;
 
 static void Text_box_move_cursor(Text_box* Text_box, DIRECTION direction) {
     switch (direction) {
@@ -300,6 +303,28 @@ static void Editor_insert_into_main_file_text(Editor* editor, int new_ch, size_t
     editor->unsaved_changes = true;
 }
 
+static bool Text_box_do_search(Text_box* text_box_to_search, const String* query) {
+    if (query->count < 1) {
+        assert(false && "not implemented");
+    }
+
+    if (query->count > 1) {
+        assert(false && "not implemented");
+    }
+    fprintf(stderr, "entering Text_box_do_search: text_box_to_search->cursor: %zu\n", text_box_to_search->cursor);
+
+    for (size_t search_offset = 0; search_offset < text_box_to_search->str.count; search_offset++) {
+        fprintf(stderr, "for loop in Text_box_do_search: search_offset: %zu\n", search_offset);
+        size_t idx_to_search = (text_box_to_search->cursor + search_offset) % text_box_to_search->str.count;
+        if (text_box_to_search->str.str[idx_to_search] == query->str[0]) {
+            text_box_to_search->cursor = idx_to_search;
+            return true;
+        }
+    }
+
+    return false;
+}
+
 static void process_next_input(Windows* windows, Editor* editor, bool* should_close) {
     switch (editor->state) {
     case STATE_INSERT: {
@@ -355,7 +380,8 @@ static void process_next_input(Windows* windows, Editor* editor, bool* should_cl
             Windows_do_resize(windows);
         } break;
         case ctrl('i'): {
-            assert(false && "not implemented");
+            editor->state = STATE_INSERT;
+            String_cpy_from_cstr(&editor->general_info.str, insert_text, strlen(insert_text));
         } break;
         case ctrl('f'): {
         } break;
@@ -378,9 +404,7 @@ static void process_next_input(Windows* windows, Editor* editor, bool* should_cl
         case KEY_BACKSPACE: {
             if (editor->search_query.cursor > 0) {
                 if (Text_box_del(&editor->search_query, editor->search_query.cursor - 1)) {
-                    fprintf(stderr, "returning from editor_search_del: success\n");
                 } else {
-                    fprintf(stderr, "returning from editor_search_del: failure\n");
                 }
             } else {
                 editor->state = STATE_INSERT;
@@ -390,7 +414,19 @@ static void process_next_input(Windows* windows, Editor* editor, bool* should_cl
         } break;
         case KEY_ENTER: // fallthrough
         case '\n': { 
-            assert(false && "not implemented");
+            switch (editor->search_status) {
+            case SEARCH_FIRST:
+                break;
+            case SEARCH_REPEAT:
+                editor->file_text.cursor++;
+                break;
+            }
+            if (!Text_box_do_search(&editor->file_text, &editor->search_query.str)) {
+                assert(false && "not implemented");
+            }
+            editor->search_status = SEARCH_REPEAT;
+            //editor->state = STATE_INSERT;
+            //String_cpy_from_cstr(&editor->general_info.str, insert_text, strlen(insert_text));
         } break;
         default: {
             Text_box_insert(&editor->search_query, new_ch, editor->search_query.cursor);
@@ -470,7 +506,7 @@ static void Text_box_get_index_scroll_offset(size_t* index, const Text_box* text
     fprintf(stderr, "end Editor_get_index_scroll_offset(%zu) result: %zu\n", text_box->scroll_y, *index);
 }
 
-static void Text_box_get_xy_at_cursor(size_t* x, size_t* y, const Text_box* text_box) {
+static void Text_box_get_screen_xy_at_cursor(size_t* screen_x, size_t* screen_y, const Text_box* text_box) {
     if (text_box->scroll_x > 0) {
         assert(false && "not implemented");
     }
@@ -478,18 +514,18 @@ static void Text_box_get_xy_at_cursor(size_t* x, size_t* y, const Text_box* text
     size_t scroll_offset;
     Text_box_get_index_scroll_offset(&scroll_offset, text_box);
     fprintf(stderr, "in Editor_get_xy_at_cursor: Editor_get_index_scroll_offset() result: %zu\n", scroll_offset);
-    *x = 0;
-    *y = 0;
+    *screen_x = 0;
+    *screen_y = 0;
     for (size_t idx = scroll_offset; idx < text_box->cursor; idx++) {
         if (text_box->str.str[idx] == '\r') {
             assert(false && "not implemented");
         }
 
         if (text_box->str.str[idx] == '\n') {
-            (*y)++;
-            *x = 0;
+            (*screen_y)++;
+            *screen_x = 0;
         } else {
-            (*x)++;
+            (*screen_x)++;
         }
     }
 }
@@ -497,7 +533,7 @@ static void Text_box_get_xy_at_cursor(size_t* x, size_t* y, const Text_box* text
 static void Text_box_scroll_if_nessessary(Text_box* text_box, size_t main_window_height, size_t main_window_width) {
     size_t cursor_x;
     size_t cursor_y;
-    Text_box_get_xy_at_cursor(&cursor_x, &cursor_y, text_box);
+    Text_box_get_screen_xy_at_cursor(&cursor_x, &cursor_y, text_box);
 
     if (cursor_y >= main_window_height) {
         fprintf(stderr, "Editor_scroll_if_nessessary(): main_window_height: %zu\n", main_window_height);
@@ -517,7 +553,7 @@ static void draw_cursor(WINDOW* window, size_t window_height, size_t window_widt
 
     size_t cursor_x;
     size_t cursor_y;
-    Text_box_get_xy_at_cursor(&cursor_x, &cursor_y, text_box);
+    Text_box_get_screen_xy_at_cursor(&cursor_x, &cursor_y, text_box);
     fprintf(stderr, "draw_cursor: cursor_y: %zu\n", cursor_y);
     fprintf(stderr, "draw_scroll: scroll_y: %zu\n", text_box->scroll_y);
     assert(window_width >= 1);
