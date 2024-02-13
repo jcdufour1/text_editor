@@ -547,17 +547,17 @@ static void Text_box_get_screen_xy_at_cursor(size_t* screen_x, size_t* screen_y,
 }
 
 static void Text_box_scroll_if_nessessary(Text_box* text_box, size_t main_window_height, size_t main_window_width) {
-    size_t cursor_x;
-    size_t cursor_y;
-    Text_box_get_screen_xy_at_cursor(&cursor_x, &cursor_y, text_box);
+    size_t screen_x;
+    size_t screen_y;
+    Text_box_get_screen_xy_at_cursor(&screen_x, &screen_y, text_box);
 
-    if (cursor_y >= main_window_height) {
-        fprintf(stderr, "Editor_scroll_if_nessessary(): main_window_height: %zu\n", main_window_height);
-        fprintf(stderr, "Editor_scroll_if_nessessary(): cursor_y: %zu\n", cursor_y);
-        text_box->scroll_y += cursor_y - main_window_height + 1;
+    if (screen_y >= main_window_height) {
+        fprintf(stderr, "Text_box_scroll_if_nessessary(): main_window_height: %zu\n", main_window_height);
+        fprintf(stderr, "Text_box_scroll_if_nessessary(): screen_y: %zu\n", screen_y);
+        text_box->scroll_y += screen_y - main_window_height + 1;
     }
 
-    if (cursor_x >= main_window_width) {
+    if (screen_x >= main_window_width) {
         assert(false && "not implemented");
     }
 }
