@@ -7,17 +7,12 @@
 #include <assert.h>
 #include <unistd.h>
 #include <string.h>
-#include <ctype.h>
+
+#include "util.h"
 
 // TODO: add undo/redo
 // TODO: add search
 // TODO: fix issue of scroll sometimes scrolling two lines instead of one
-
-#define INFO_HEIGHT 4
-
-#define TEXT_DEFAULT_CAP 512
-
-#define ctrl(x)           ((x) & 0x1f)
 
 typedef enum {STATE_INSERT = 0, STATE_COMMAND, STATE_SEARCH, STATE_QUIT_CONFIRM} STATE;
 
@@ -25,72 +20,6 @@ static const char* insert_text = "[insert]: press ctrl-I to enter command mode o
 static const char* command_text = "[command]: press q to quit. press ctrl-I to go back to insert mode";
 static const char* search_text = "[search]: ";
 static const char* quit_confirm_text = "Are you sure that you want to exit without saving? N/y";
-
-
-static void* safe_malloc(size_t s) {
-    void* ptr = malloc(s);
-    if (!ptr) {
-        fprintf(stderr, "fetal error: could not allocate memory\n");
-        exit(1);
-    }
-    return ptr;
-}
-
-static void* safe_realloc(void* buf, size_t s) {
-    buf = realloc(buf, s);
-    if (!buf) {
-        fprintf(stderr, "fetal error: could not allocate memory\n");
-        exit(1);
-    }
-    return buf;
-}
-
-typedef struct {
-    char* str;
-    size_t capacity;
-    size_t count;
-} String;
-
-//static void String_resize_if_nessessary(
-static void String_insert(String* string, char new_ch, size_t index) {
-    assert(index <= string->count);
-    if (string->capacity < string->count + 1) {
-        if (string->capacity == 0) {
-            string->capacity = TEXT_DEFAULT_CAP;
-            string->str = safe_malloc(string->capacity * sizeof(char));
-            memset(string->str, 0, string->capacity);
-        } else {
-            size_t text_prev_capacity = string->capacity;
-            string->capacity = string->capacity * 2;
-            string->str = safe_realloc(string->str, string->capacity * sizeof(char));
-            memset(string->str + text_prev_capacity, 0, string->capacity - text_prev_capacity);
-        }
-    }
-    assert(string->capacity >= string->count + 1);
-    memmove(string->str + index + 1, string->str + index, string->count - index);
-    string->str[index] = new_ch;
-    string->count++;
-}
-
-static void String_cpy_from_cstr(String* dest, const char* src, size_t src_size) {
-    if (dest->capacity < dest->count + 1) {
-        if (dest->capacity == 0) {
-            dest->capacity = TEXT_DEFAULT_CAP;
-            dest->str = safe_malloc(dest->capacity * sizeof(char));
-            memset(dest->str, 0, dest->capacity);
-        } 
-        size_t text_prev_capacity = dest->capacity;
-        while (dest->capacity < dest->count + 1) {
-            dest->capacity = dest->capacity * 2;
-        }
-        dest->str = safe_realloc(dest->str, dest->capacity * sizeof(char));
-        memset(dest->str + text_prev_capacity, 0, dest->capacity - text_prev_capacity);
-    }
-    assert(dest->capacity >= dest->count + src_size);
-
-    memmove(dest->str, src, src_size);
-    dest->count = src_size;
-}
 
 typedef struct {
     String str;
@@ -182,14 +111,6 @@ static bool get_index_start_prev_line(size_t* result, const Text_box* text, size
     return true;
 }
 
-static bool String_del(String* string, size_t index) {
-    fprintf(stderr, "String_del: index: %zu    string->count: %zu\n", index, string->count);
-    assert(index < string->count);
-    memmove(string->str + index, string->str + index + 1, string->count - index - 1);
-    string->count--;
-    return true;
-}
-
 static bool Text_box_del(Text_box* editor, size_t index) {
     if (editor->str.count < 1) {
         return false;
@@ -210,10 +131,6 @@ static void Text_box_insert(Text_box* text_box, int new_ch, size_t index) {
 
 static void Text_box_append(Text_box* text, int new_ch) {
     Text_box_insert(text, new_ch, text->str.count);
-}
-
-static void String_append(String* string, int new_ch) {
-    String_insert(string, new_ch, string->count);
 }
 
 typedef enum {DIR_UP, DIR_DOWN, DIR_RIGHT, DIR_LEFT} DIRECTION;
@@ -358,10 +275,6 @@ static void Editor_save(Editor* editor) {
     //Editor_search_insert(editor, new_ch, editor->search_query.count - 1);
 //}
 
-static void String_pop(String* string) {
-    String_del(string, string->count - 1);
-}
-
 /*
 static bool Editor_search_del(Editor* editor, size_t index) {
     if (editor->search_query.str.count < 1) {
@@ -475,9 +388,9 @@ static void process_next_input(Windows* windows, Editor* editor, bool* should_cl
                 //fprintf(stderr, "editor->search_cursor: %zu\n", editor->search_query.cursor);
             }
         } break;
-        case KEY_ENTER: {
+        case KEY_ENTER: // fallthrough
+        case '\n': { 
             assert(false && "not implemented");
-            //editor_search_enter(editor, '\n', editor->cursor);
         } break;
         default: {
             Text_box_insert(&editor->search_query, new_ch, editor->search_query.cursor);
