@@ -23,6 +23,7 @@ typedef enum {SEARCH_FIRST, SEARCH_REPEAT} SEARCH_STATUS;
 static const char* insert_text = "[insert]: press ctrl-I to enter command mode or exit";
 static const char* command_text = "[command]: press q to quit. press ctrl-I to go back to insert mode";
 static const char* search_text = "[search]: ";
+static const char* search_failure_text = "[search]: no results";
 static const char* quit_confirm_text = "Are you sure that you want to exit without saving? N/y";
 
 typedef struct {
@@ -303,20 +304,30 @@ static void Editor_insert_into_main_file_text(Editor* editor, int new_ch, size_t
     editor->unsaved_changes = true;
 }
 
+//static bool String_substrin
+
 static bool Text_box_do_search(Text_box* text_box_to_search, const String* query) {
     if (query->count < 1) {
         assert(false && "not implemented");
     }
 
-    if (query->count > 1) {
-        assert(false && "not implemented");
-    }
-    fprintf(stderr, "entering Text_box_do_search: text_box_to_search->cursor: %zu\n", text_box_to_search->cursor);
-
     for (size_t search_offset = 0; search_offset < text_box_to_search->str.count; search_offset++) {
-        fprintf(stderr, "for loop in Text_box_do_search: search_offset: %zu\n", search_offset);
         size_t idx_to_search = (text_box_to_search->cursor + search_offset) % text_box_to_search->str.count;
-        if (text_box_to_search->str.str[idx_to_search] == query->str[0]) {
+
+        if (idx_to_search + query->count > text_box_to_search->str.count) {
+            continue;
+        };
+
+        bool string_at_idx = true;
+
+        for (size_t query_idx = 0; query_idx < query->count; query_idx++) {
+            if (text_box_to_search->str.str[idx_to_search + query_idx] != query->str[query_idx]) {
+                string_at_idx = false;
+                break;
+            }
+        }
+
+        if (string_at_idx) {
             text_box_to_search->cursor = idx_to_search;
             return true;
         }
@@ -412,6 +423,7 @@ static void process_next_input(Windows* windows, Editor* editor, bool* should_cl
                 //fprintf(stderr, "editor->search_cursor: %zu\n", editor->search_query.cursor);
             }
         } break;
+        case ctrl('n'): // fallthrough
         case KEY_ENTER: // fallthrough
         case '\n': { 
             switch (editor->search_status) {
@@ -421,13 +433,17 @@ static void process_next_input(Windows* windows, Editor* editor, bool* should_cl
                 editor->file_text.cursor++;
                 break;
             }
-            if (!Text_box_do_search(&editor->file_text, &editor->search_query.str)) {
-                assert(false && "not implemented");
+            if (Text_box_do_search(&editor->file_text, &editor->search_query.str)) {
+                editor->search_status = SEARCH_REPEAT;
+                String_cpy_from_cstr(&editor->general_info.str, search_text, strlen(search_text));
+            } else {
+                String_cpy_from_cstr(&editor->general_info.str, search_failure_text, strlen(search_failure_text));
             }
-            editor->search_status = SEARCH_REPEAT;
             //editor->state = STATE_INSERT;
             //String_cpy_from_cstr(&editor->general_info.str, insert_text, strlen(insert_text));
         } break;
+        case ctrl('p'):
+            assert(false && "backward search not implemented");
         default: {
             Text_box_insert(&editor->search_query, new_ch, editor->search_query.cursor);
         } break;
