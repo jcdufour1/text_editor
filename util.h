@@ -19,7 +19,7 @@ static void* safe_malloc(size_t s) {
     void* ptr = malloc(s);
     if (!ptr) {
         fprintf(stderr, "fetal error: could not allocate memory\n");
-        exit(1);
+        abort();
     }
     return ptr;
 }
@@ -28,7 +28,7 @@ static void* safe_realloc(void* buf, size_t s) {
     buf = realloc(buf, s);
     if (!buf) {
         fprintf(stderr, "fetal error: could not allocate memory\n");
-        exit(1);
+        abort();
     }
     return buf;
 }
@@ -38,6 +38,8 @@ typedef struct {
     size_t capacity;
     size_t count;
 } String;
+
+//#define String_fmt
 
 //static void String_resize_if_nessessary(
 static void String_insert(String* string, char new_ch, size_t index) {
@@ -61,6 +63,7 @@ static void String_insert(String* string, char new_ch, size_t index) {
 }
 
 static void String_cpy_from_cstr(String* dest, const char* src, size_t src_size) {
+    memset(dest, 0, sizeof(*dest));
     if (dest->capacity < dest->count + 1) {
         if (dest->capacity == 0) {
             dest->capacity = TEXT_DEFAULT_CAP;
