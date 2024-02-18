@@ -15,6 +15,8 @@
 
 #define ctrl(x)           ((x) & 0x1f)
 
+typedef enum {SEARCH_DIR_FORWARDS, SEARCH_DIR_BACKWARDS} SEARCH_DIR;
+
 static void* safe_malloc(size_t s) {
     void* ptr = malloc(s);
     if (!ptr) {
@@ -98,5 +100,17 @@ static bool String_del(String* string, size_t index) {
 static void String_pop(String* string) {
     String_del(string, string->count - 1);
 }
+
+static void String_get_curr_line(char* buf, const String* string, size_t starting_index) {
+    memset(buf, 0, 1024);
+
+    while (string->str[starting_index] != '\n') {
+        buf[starting_index] = string->str[starting_index];
+        starting_index++;
+    }
+
+}
+
+#define MIN(lhs, rhs) ((lhs) < (rhs) ? (lhs) : (rhs))
 
 #endif // UTIL_H
