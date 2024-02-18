@@ -339,7 +339,7 @@ static bool Text_box_do_search(Text_box* text_box_to_search, const String* query
         }
     } break;
     case SEARCH_DIR_BACKWARDS: {
-        for (int64_t search_offset = 0; search_offset > -(int64_t)text_box_to_search->str.count; search_offset--) {
+        for (int64_t search_offset = text_box_to_search->str.count - 1; search_offset >= 0; search_offset--) {
             int64_t idx_to_search = (text_box_to_search->cursor + search_offset) % text_box_to_search->str.count;
 
             if (idx_to_search + 1 < (int64_t)query->count) {
@@ -370,7 +370,8 @@ static bool Text_box_do_search(Text_box* text_box_to_search, const String* query
     return false;
 }
 
-static void process_next_input(Windows* windows, Editor* editor, bool* should_close) {
+static void process_next_input(bool* should_resize_window, Windows* windows, Editor* editor, bool* should_close) {
+    *should_resize_window = false;
     switch (editor->state) {
     case STATE_INSERT: {
         int new_ch = wgetch(windows->main_window);
@@ -443,10 +444,10 @@ static void process_next_input(Windows* windows, Editor* editor, bool* should_cl
             Text_box_move_cursor(&editor->search_query, DIR_RIGHT);
         } break;
         case KEY_UP: {
-            assert(false && "not implemented");
+            //assert(false && "not implemented");
         } break;
         case KEY_DOWN: {
-            assert(false && "not implemented");
+            //assert(false && "not implemented");
         } break;
         case KEY_BACKSPACE: {
             if (editor->search_query.cursor > 0) {
@@ -514,7 +515,7 @@ static void process_next_input(Windows* windows, Editor* editor, bool* should_cl
         int new_ch = wgetch(windows->main_window);
         switch (new_ch) {
         case KEY_RESIZE: {
-            Windows_do_resize(windows);
+            *should_resize_window = true;
         } break;
         case 'q': {
             if (editor->unsaved_changes) {
@@ -642,7 +643,7 @@ static void Text_box_get_screen_xy_at_cursor(int64_t* screen_x, int64_t* screen_
             //"        ENTERING for loop in Text_box_get_screen_xy_at_cursor: decrement general    scroll_offset: %zu    char at cursor: '%c'\n", scroll_offset, char_at_cursor
         //);
         int64_t idx;
-        for (idx = scroll_offset; idx >= (int64_t)text_box->cursor; idx--) {
+        for (idx = scroll_offset - 1; idx >= (int64_t)text_box->cursor; idx--) {
             if (text_box->str.str[idx] == '\r') {
                 assert(false && "not implemented");
             }
@@ -693,31 +694,6 @@ static void Text_box_get_screen_xy_at_cursor(int64_t* screen_x, int64_t* screen_
     //fprintf(stderr, "    exiting Editor_get_xy_at_cursor: Editor_get_index_scroll_offset()\n");
 }
 
-static void Text_box_scroll_if_nessessary_alt(Text_box* text_box, int64_t main_window_height, int64_t main_window_width) {
-    int64_t screen_x;
-    int64_t screen_y;
-    Text_box_get_screen_xy_at_cursor(&screen_x, &screen_y, text_box);
-
-    //while (screen_y < main_window_width - 1) {
-        //Text_box_get_screen_xy_at_cursor(&screen_x, &screen_y, text_box);
-        //text_box->cursor++;
-    //}
-
-    if (screen_y >= main_window_height) {
-        //fprintf(stderr, "Text_box_scroll_if_nessessary(): main_window_height: %zu\n", main_window_height);
-        //fprintf(stderr, "did increment before increment: Text_box_scroll_if_nessessary(): screen_y: %zu\n", screen_y);
-        text_box->scroll_y += screen_y - main_window_height + 1;
-        //fprintf(stderr, "did increment after increment: Text_box_scroll_if_nessessary(): screen_y - main_window_height + 1: %zu\n", screen_y - main_window_height + 1);
-    } else {
-        //fprintf(stderr, "Text_box_scroll_if_nessessary(): main_window_height: %zu\n", main_window_height);
-        //fprintf(stderr, "not increment: Text_box_scroll_if_nessessary(): screen_y: %zu\n", screen_y);
-    }
-
-    if (screen_x >= main_window_width) {
-        assert(false && "not implemented");
-    }
-}
-
 static void Text_box_scroll_if_nessessary(Text_box* text_box, int64_t main_window_height, int64_t main_window_width) {
     //fprintf(stderr, "entering Text_box_scroll_if_nessessary(): main_window_height: %zu\n", main_window_height);
     int64_t screen_x;
@@ -725,13 +701,17 @@ static void Text_box_scroll_if_nessessary(Text_box* text_box, int64_t main_windo
     Text_box_get_screen_xy_at_cursor(&screen_x, &screen_y, text_box);
     //fprintf(stderr, "in Text_box_scroll_if_nessessary(): screen_x: %zu    screen_y: %zu\n", screen_x, screen_y);
 
-    while (screen_y >= main_window_height) {
-        text_box->scroll_y += 1;
-        Text_box_get_screen_xy_at_cursor(&screen_x, &screen_y, text_box);
+    //while (screen_y >= main_window_height) {
+    //    text_box->scroll_y += 1;
+    //    Text_box_get_screen_xy_at_cursor(&screen_x, &screen_y, text_box);
+    //}
+    if (screen_y >= main_window_height) {
+        text_box->scroll_y += screen_y - main_window_height + 1;
     }
-    while (screen_y < 0) {
-        text_box->scroll_y -= 1;
-        Text_box_get_screen_xy_at_cursor(&screen_x, &screen_y, text_box);
+    if (screen_y < 0) {
+        //fprintf(stderr, "before: text_box->scroll_y: %zu    screen_y: %zi\n", text_box->scroll_y, screen_y);
+        text_box->scroll_y += screen_y;
+        //fprintf(stderr, "after: text_box->scroll_y: %zu    screen_y: %zi\n", text_box->scroll_y, screen_y);
     }
     //size_t scroll_offset;
     //Text_box_get_index_scroll_offset(&scroll_offset, text_box);
@@ -1003,13 +983,17 @@ int main(int argc, char** argv) {
 
     String_cpy_from_cstr(&editor.general_info.str, insert_text, strlen(insert_text));
 
-    Text_box_scroll_if_nessessary_alt(&editor.file_text, windows->main_height, windows->main_width);
+    Text_box_scroll_if_nessessary(&editor.file_text, windows->main_height, windows->main_width);
 
     bool should_close = false;
+    bool should_resize_window = false;
     while (!should_close) {
 
         // draw
         clear();    // erase();
+        if (should_resize_window) {
+            Windows_do_resize(windows);
+        }
 
         // scroll if nessessary
         Text_box_scroll_if_nessessary(&editor.file_text, windows->main_height, windows->main_width);
@@ -1025,7 +1009,7 @@ int main(int argc, char** argv) {
         //draw_cursor(windows->info_window, windows->info_height, windows->info_width, &editor.search_query);
 
         // get and process next keystroke
-        process_next_input(windows, &editor, &should_close);
+        process_next_input(&should_resize_window, windows, &editor, &should_close);
         assert(editor.file_text.cursor < editor.file_text.str.count + 1);
     }
     endwin();
