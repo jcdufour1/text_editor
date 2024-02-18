@@ -8,12 +8,15 @@
 #include <assert.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdio.h>
 
 #define TEXT_DEFAULT_CAP 512
 
 #define INFO_HEIGHT 4
 
 #define ctrl(x)           ((x) & 0x1f)
+
+typedef enum {SEARCH_DIR_FORWARDS, SEARCH_DIR_BACKWARDS} SEARCH_DIR;
 
 static void* safe_malloc(size_t s) {
     void* ptr = malloc(s);
@@ -97,6 +100,42 @@ static bool String_del(String* string, size_t index) {
 
 static void String_pop(String* string) {
     String_del(string, string->count - 1);
+}
+
+static void String_get_curr_line(char* buf, const String* string, size_t starting_index) {
+    memset(buf, 0, 1024);
+
+    while (string->str[starting_index] != '\n') {
+        buf[starting_index] = string->str[starting_index];
+        starting_index++;
+    }
+
+}
+
+#define MIN(lhs, rhs) ((lhs) < (rhs) ? (lhs) : (rhs))
+
+static bool actual_write(const char* dest_file_name, const char* data, size_t data_size) {
+    FILE* dest_file = fopen(dest_file_name, "wb");
+    if (!dest_file) {
+        assert(false && "not implemented");
+        //return false;
+        exit(1);
+    }
+
+    ssize_t total_amount_written = 0;
+    ssize_t amount_written;
+    do {
+        amount_written = fwrite(data + total_amount_written, 1, data_size, dest_file);
+        total_amount_written += amount_written;
+        if (amount_written < 1) {
+            fprintf(stderr, "error: file %s could not be written: errno: %d: %s\n", dest_file_name, errno, strerror(errno));
+            fclose(dest_file);
+            return false;
+        }
+    } while(total_amount_written < (ssize_t)data_size);
+
+    fclose(dest_file);
+    return true;
 }
 
 #endif // UTIL_H
