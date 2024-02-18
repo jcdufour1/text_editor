@@ -517,6 +517,7 @@ static void String_get_curr_line(char* buf, const String* string, size_t startin
 }
 
 static void Text_box_get_index_scroll_offset(size_t* index, const Text_box* text_box) {
+    // index will be set to the index of the beginning of the line at text_box->scroll_x
     fprintf(stderr, "        starting Text_box_get_index_scroll_offset() text_box->scroll_y: %zu\n", text_box->scroll_y);
     if (text_box->scroll_x > 0) {
         assert(false && "not implemented");
@@ -524,6 +525,9 @@ static void Text_box_get_index_scroll_offset(size_t* index, const Text_box* text
 
     *index = 0;
     //char* curr_line = safe_malloc(10000);
+    if (text_box->str.count < 1) {
+        return;
+    }
     fprintf(stderr, "        in Text_box_get_index_scroll_offset: index: %zu    char: '%c'\n", *index, text_box->str.str[*index]);
     for (size_t curr_y = 0; curr_y < text_box->scroll_y; curr_y++) {
         //String_get_curr_line(curr_line, &text_box->str, *index);
@@ -531,6 +535,7 @@ static void Text_box_get_index_scroll_offset(size_t* index, const Text_box* text
         if (!get_index_start_next_line(index, text_box, *index)) {
             assert(false);
         }
+        /*
         switch (curr_y) {
             case 0:
                 assert('j' == text_box->str.str[*index]);
@@ -541,6 +546,7 @@ static void Text_box_get_index_scroll_offset(size_t* index, const Text_box* text
             default:
                 assert(false && "not impelmetneed");
         }
+        */
         fprintf(stderr, "        in Text_box_get_index_scroll_offset: curr_y: %zu    index: %zu    char: '%c'\n", curr_y, *index, text_box->str.str[*index]);
 
         //if (curr_y + 1 < 0) {
@@ -548,6 +554,7 @@ static void Text_box_get_index_scroll_offset(size_t* index, const Text_box* text
         //}
     }
 
+    /*
     switch (text_box->str.str[*index]) {
         case 0:
             assert('a' == text_box->str.str[*index]);
@@ -556,6 +563,7 @@ static void Text_box_get_index_scroll_offset(size_t* index, const Text_box* text
             assert(text_box->str.str[*index - 1] == '\n');
             break;
     }
+    */
 
     fprintf(stderr, "        end Text_box_get_index_scroll_offset() text_box->scroll_y: %zu    result: %zu\n", text_box->scroll_y, *index);
 }
@@ -626,9 +634,13 @@ static void Text_box_scroll_if_nessessary(Text_box* text_box, size_t main_window
     fprintf(stderr, "in Text_box_scroll_if_nessessary(): screen_x: %zu    screen_y: %zu\n", screen_x, screen_y);
 
     if (screen_y >= main_window_height) {
+        while (screen_y >= main_window_height) {
+            text_box->scroll_y += 1;
+            Text_box_get_screen_xy_at_cursor(&screen_x, &screen_y, text_box);
+        }
         //fprintf(stderr, "Text_box_scroll_if_nessessary(): main_window_height: %zu\n", main_window_height);
         fprintf(stderr, "did increment before increment: Text_box_scroll_if_nessessary(): screen_y: %zu\n", screen_y);
-        text_box->scroll_y += screen_y - main_window_height + 1;
+        //text_box->scroll_y += screen_y - main_window_height + 1;
         fprintf(stderr, "did increment after increment: Text_box_scroll_if_nessessary(): screen_y - main_window_height + 1: %zu\n", screen_y - main_window_height + 1);
     } else {
         //fprintf(stderr, "Text_box_scroll_if_nessessary(): main_window_height: %zu\n", main_window_height);
@@ -754,9 +766,39 @@ static void parse_args(Editor* editor, int argc, char** argv) {
     editor->file_text.cursor = 0;
 }
 
+void test_Text_box_scroll_if_nessessary(void) {
+    Editor* editor = safe_malloc(sizeof(*editor));
+    memset(editor, 0, sizeof(*editor));
+
+    //Text_box_scroll_if_nessessary(&editor.file_text, windows->main_height, windows->main_width);
+
+    free(editor);
+}
+
+void test_template_Text_box_get_index_scroll_offset(const char* text, size_t scroll_x, size_t expected_offset) {
+    Text_box* text_box = safe_malloc(sizeof(*text_box));
+    memset(text_box, 0, sizeof(*text_box));
+
+    String_cpy_from_cstr(&text_box->str, text, sizeof(text));
+    text_box->scroll_x = scroll_x;
+    size_t index;
+    Text_box_get_index_scroll_offset(&index, text_box);
+    assert(expected_offset == index && "test failed");
+    free(text_box);
+}
+
 void test_Text_box_get_index_scroll_offset(void) {
-    //Text_box_get_index_scroll_offset
-    assert(false);
+    test_template_Text_box_get_index_scroll_offset("hello\nworld\n", 0, 0);
+    test_template_Text_box_get_index_scroll_offset("hello\nworld\n", 1, 6);
+
+    test_template_Text_box_get_index_scroll_offset("hello\n\nworld\n", 0, 0);
+    test_template_Text_box_get_index_scroll_offset("hello\n\nworld\n", 1, 6);
+    test_template_Text_box_get_index_scroll_offset("hello\n\nworld\n", 2, 7);
+
+    test_template_Text_box_get_index_scroll_offset("\nhello\n\nworld\n", 0, 0);
+    test_template_Text_box_get_index_scroll_offset("\nhello\n\nworld\n", 1, 1);
+    test_template_Text_box_get_index_scroll_offset("\nhello\n\nworld\n", 2, 7);
+    test_template_Text_box_get_index_scroll_offset("\nhello\n\nworld\n", 3, 8);
 }
 
 void test_template_get_index_start_next_line(const char* test_string, size_t index_before, size_t expected_result) {
