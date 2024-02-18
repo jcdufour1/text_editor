@@ -20,6 +20,8 @@ typedef enum {DIR_UP, DIR_DOWN, DIR_RIGHT, DIR_LEFT} DIRECTION;
 
 typedef enum {SEARCH_FIRST, SEARCH_REPEAT} SEARCH_STATUS;
 
+typedef enum {SEARCH_DIR_FORWARDS, SEARCH_DIR_BACKWARDS} SEARCH_DIR;
+
 static const char* insert_text = "[insert]: press ctrl-I to enter command mode or exit";
 static const char* command_text = "[command]: press q to quit. press ctrl-I to go back to insert mode";
 static const char* search_text = "[search]: ";
@@ -306,31 +308,62 @@ static void Editor_insert_into_main_file_text(Editor* editor, int new_ch, size_t
 
 //static bool String_substrin
 
-static bool Text_box_do_search(Text_box* text_box_to_search, const String* query) {
+static bool Text_box_do_search(Text_box* text_box_to_search, const String* query, SEARCH_DIR search_direction) {
     if (query->count < 1) {
         assert(false && "not implemented");
     }
 
-    for (size_t search_offset = 0; search_offset < text_box_to_search->str.count; search_offset++) {
-        size_t idx_to_search = (text_box_to_search->cursor + search_offset) % text_box_to_search->str.count;
+    switch (search_direction) {
+    case SEARCH_DIR_FORWARDS: {
+        for (size_t search_offset = 0; search_offset < text_box_to_search->str.count; search_offset++) {
+            size_t idx_to_search = (text_box_to_search->cursor + search_offset) % text_box_to_search->str.count;
 
-        if (idx_to_search + query->count > text_box_to_search->str.count) {
-            continue;
-        };
+            if (idx_to_search + query->count > text_box_to_search->str.count) {
+                continue;
+            };
 
-        bool string_at_idx = true;
+            bool string_at_idx = true;
 
-        for (size_t query_idx = 0; query_idx < query->count; query_idx++) {
-            if (text_box_to_search->str.str[idx_to_search + query_idx] != query->str[query_idx]) {
-                string_at_idx = false;
-                break;
+            for (size_t query_idx = 0; query_idx < query->count; query_idx++) {
+                if (text_box_to_search->str.str[idx_to_search + query_idx] != query->str[query_idx]) {
+                    string_at_idx = false;
+                    break;
+                }
+            }
+
+            if (string_at_idx) {
+                text_box_to_search->cursor = idx_to_search;
+                return true;
             }
         }
+    } break;
+    case SEARCH_DIR_BACKWARDS: {
+        for (int64_t search_offset = 0; search_offset > -(int64_t)text_box_to_search->str.count; search_offset--) {
+            int64_t idx_to_search = (text_box_to_search->cursor + search_offset) % text_box_to_search->str.count;
 
-        if (string_at_idx) {
-            text_box_to_search->cursor = idx_to_search;
-            return true;
+            if (idx_to_search + 1 < (int64_t)query->count) {
+                continue;
+            };
+
+            bool string_at_idx = true;
+
+            for (int64_t query_idx = query->count - 1; query_idx > 0; query_idx--) {
+                assert((idx_to_search + query_idx) - (int64_t)query->count >= 0);
+                if (text_box_to_search->str.str[(idx_to_search + query_idx) - query->count] != query->str[query_idx]) {
+                    string_at_idx = false;
+                    break;
+                }
+            }
+
+            if (string_at_idx) {
+                text_box_to_search->cursor = idx_to_search - query->count;
+                return true;
+            }
         }
+    } break;
+    default:
+        assert(false && "unreachable");
+        abort();
     }
 
     return false;
@@ -431,9 +464,13 @@ static void process_next_input(Windows* windows, Editor* editor, bool* should_cl
                 break;
             case SEARCH_REPEAT:
                 editor->file_text.cursor++;
+                editor->file_text.cursor %= editor->file_text.str.count;
                 break;
+            default:
+                assert(false && "unreachable");
+                abort();
             }
-            if (Text_box_do_search(&editor->file_text, &editor->search_query.str)) {
+            if (Text_box_do_search(&editor->file_text, &editor->search_query.str, SEARCH_DIR_FORWARDS)) {
                 editor->search_status = SEARCH_REPEAT;
                 String_cpy_from_cstr(&editor->general_info.str, search_text, strlen(search_text));
             } else {
@@ -442,8 +479,29 @@ static void process_next_input(Windows* windows, Editor* editor, bool* should_cl
             //editor->state = STATE_INSERT;
             //String_cpy_from_cstr(&editor->general_info.str, insert_text, strlen(insert_text));
         } break;
-        case ctrl('p'):
-            assert(false && "backward search not implemented");
+        case ctrl('p'): {
+            switch (editor->search_status) {
+            case SEARCH_FIRST:
+                break;
+            case SEARCH_REPEAT:
+                if (editor->file_text.cursor == 0) {
+                    editor->file_text.cursor = editor->file_text.str.count - 1;
+                } else {
+                    editor->file_text.cursor--;
+                    editor->file_text.cursor %= editor->file_text.str.count;
+                }
+                break;
+            default:
+                assert(false && "unreachable");
+                abort();
+            }
+            if (Text_box_do_search(&editor->file_text, &editor->search_query.str, SEARCH_DIR_BACKWARDS)) {
+                editor->search_status = SEARCH_REPEAT;
+                String_cpy_from_cstr(&editor->general_info.str, search_text, strlen(search_text));
+            } else {
+                String_cpy_from_cstr(&editor->general_info.str, search_failure_text, strlen(search_failure_text));
+            }
+        } break;
         default: {
             Text_box_insert(&editor->search_query, new_ch, editor->search_query.cursor);
         } break;
