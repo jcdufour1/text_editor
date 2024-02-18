@@ -13,6 +13,7 @@
 // TODO: add undo/redo
 // TODO: add scroll up
 // TODO: speed up scrolling/searching
+// TODO: make visual mode part of Text_box?
 
 typedef enum {STATE_INSERT = 0, STATE_COMMAND, STATE_SEARCH, STATE_QUIT_CONFIRM} STATE;
 
@@ -96,7 +97,7 @@ static size_t get_index_start_curr_line(const Text_box* text, size_t curr_cursor
 
 static bool get_index_start_prev_line(size_t* result, const Text_box* text, size_t curr_cursor) {
     curr_cursor = get_index_start_curr_line(text, curr_cursor);
-    fprintf(stderr, "start get_index_start_prev_line(): from get_index_start_curr_line: curr_cursor: %zu\n", curr_cursor);
+    //fprintf(stderr, "start get_index_start_prev_line(): from get_index_start_curr_line: curr_cursor: %zu\n", curr_cursor);
     if (curr_cursor < 1) {
         *result = get_index_start_curr_line(text, curr_cursor);
         return false;
@@ -154,7 +155,7 @@ static void Text_box_move_cursor(Text_box* Text_box, DIRECTION direction) {
             assert(Text_box->user_max_col <= Text_box->str.count && "invalid text->user_max_col");
             break;
         case DIR_UP: {
-            size_t idx_curr_line_start = get_index_start_curr_line(Text_box, Text_box->cursor);
+            //size_t idx_curr_line_start = get_index_start_curr_line(Text_box, Text_box->cursor);
 
             size_t idx_prev_line_start;
             get_index_start_prev_line(&idx_prev_line_start, Text_box, Text_box->cursor);
@@ -162,18 +163,18 @@ static void Text_box_move_cursor(Text_box* Text_box, DIRECTION direction) {
             size_t idx_col_offset = MIN(Text_box->user_max_col, len_curr_line(Text_box, idx_prev_line_start));
             //size_t idx_prev_col_offset = text->cursor - idx_prev_line_start;
             size_t new_cursor_idx = idx_prev_line_start + idx_col_offset;
-            fprintf(stderr, "dir_up: text->user_max_col: %zu\n", Text_box->user_max_col);
-            fprintf(stderr, "dir_up: idx_prev_line_start: %zu\n", idx_prev_line_start);
-            fprintf(stderr, "dir_up: idx_curr_line_start: %zu\n", idx_curr_line_start);
-            fprintf(stderr, "dir_up: idx_col_offset: %zu\n", idx_col_offset);
-            fprintf(stderr, "dir_up: new_cursor_idx: %zu\n", new_cursor_idx);
+            //fprintf(stderr, "dir_up: text->user_max_col: %zu\n", Text_box->user_max_col);
+            //fprintf(stderr, "dir_up: idx_prev_line_start: %zu\n", idx_prev_line_start);
+            //fprintf(stderr, "dir_up: idx_curr_line_start: %zu\n", idx_curr_line_start);
+            //fprintf(stderr, "dir_up: idx_col_offset: %zu\n", idx_col_offset);
+            //fprintf(stderr, "dir_up: new_cursor_idx: %zu\n", new_cursor_idx);
             //fprintf(stderr, "idx_prev_line_start: %zu\n", idx_prev_line_start);
             //fprintf(stderr, "idx_col_offset: %zu\n", idx_col_offset);
             //fprintf(stderr, "new_cursor_idx: %zu\n", new_cursor_idx);
             Text_box->cursor = new_cursor_idx;
         } break;
         case DIR_DOWN: {
-            size_t idx_curr_line_start = get_index_start_curr_line(Text_box, Text_box->cursor);
+            //size_t idx_curr_line_start = get_index_start_curr_line(Text_box, Text_box->cursor);
             size_t idx_next_line_start;
             if (!get_index_start_next_line(&idx_next_line_start, Text_box, Text_box->cursor)) {
                 break;
@@ -182,11 +183,11 @@ static void Text_box_move_cursor(Text_box* Text_box, DIRECTION direction) {
             size_t idx_col_offset = MIN(Text_box->user_max_col, len_curr_line(Text_box, idx_next_line_start));
             //size_t idx_prev_col_offset = text->cursor - idx_prev_line_start;
             size_t new_cursor_idx = idx_next_line_start + idx_col_offset;
-            fprintf(stderr, "dir_down: text->user_max_col: %zu\n", Text_box->user_max_col);
-            fprintf(stderr, "dir_down: idx_curr_line_start: %zu\n", idx_curr_line_start);
-            fprintf(stderr, "dir_down: idx_next_line_start: %zu\n", idx_next_line_start);
-            fprintf(stderr, "dir_down: idx_col_offset: %zu\n", idx_col_offset);
-            fprintf(stderr, "dir_down: new_cursor_idx: %zu\n", new_cursor_idx);
+            //fprintf(stderr, "dir_down: text->user_max_col: %zu\n", Text_box->user_max_col);
+            //fprintf(stderr, "dir_down: idx_curr_line_start: %zu\n", idx_curr_line_start);
+            //fprintf(stderr, "dir_down: idx_next_line_start: %zu\n", idx_next_line_start);
+            //fprintf(stderr, "dir_down: idx_col_offset: %zu\n", idx_col_offset);
+            //fprintf(stderr, "dir_down: new_cursor_idx: %zu\n", new_cursor_idx);
             Text_box->cursor = new_cursor_idx;
         } break;
             break;
@@ -428,16 +429,18 @@ static void process_next_input(Windows* windows, Editor* editor, bool* should_cl
             String_cpy_from_cstr(&editor->general_info.str, insert_text, strlen(insert_text));
         } break;
         case ctrl('f'): {
+            editor->state = STATE_INSERT;
+            String_cpy_from_cstr(&editor->general_info.str, insert_text, strlen(insert_text));
         } break;
         case ctrl('s'): {
             assert(false && "not implemented");
             //editor_save(editor);
         } break;
         case KEY_LEFT: {
-            assert(false && "not implemented");
+            Text_box_move_cursor(&editor->search_query, DIR_LEFT);
         } break;
         case KEY_RIGHT: {
-            assert(false && "not implemented");
+            Text_box_move_cursor(&editor->search_query, DIR_RIGHT);
         } break;
         case KEY_UP: {
             assert(false && "not implemented");
@@ -621,23 +624,23 @@ void getline_thing(char* buf, const char* str) {
 }
 
 static void Text_box_get_screen_xy_at_cursor(int64_t* screen_x, int64_t* screen_y, const Text_box* text_box) {
-    fprintf(stderr, "    entering Editor_get_xy_at_cursor: Editor_get_index_scroll_offset()\n");
+    //fprintf(stderr, "    entering Editor_get_xy_at_cursor: Editor_get_index_scroll_offset()\n");
     if (text_box->scroll_x > 0) {
         assert(false && "not implemented");
     }
 
     size_t scroll_offset;
     Text_box_get_index_scroll_offset(&scroll_offset, text_box, false);
-    fprintf(stderr, "    in Editor_get_xy_at_cursor: Editor_get_index_scroll_offset() result: %zu\n", scroll_offset);
+    //fprintf(stderr, "    in Editor_get_xy_at_cursor: Editor_get_index_scroll_offset() result: %zu\n", scroll_offset);
     *screen_x = 0;
     *screen_y = 0;
     if (scroll_offset > text_box->cursor) {
-        Text_box_get_index_scroll_offset(&scroll_offset, text_box, true);
-        const char char_at_cursor = text_box->str.str[text_box->cursor];
-        fprintf(
-            stderr, 
-            "        ENTERING for loop in Text_box_get_screen_xy_at_cursor: decrement general    scroll_offset: %zu    char at cursor: '%c'\n", scroll_offset, char_at_cursor
-        );
+        Text_box_get_index_scroll_offset(&scroll_offset, text_box, false);
+        //const char char_at_cursor = text_box->str.str[text_box->cursor];
+        //fprintf(
+            //stderr, 
+            //"        ENTERING for loop in Text_box_get_screen_xy_at_cursor: decrement general    scroll_offset: %zu    char at cursor: '%c'\n", scroll_offset, char_at_cursor
+        //);
         int64_t idx;
         for (idx = scroll_offset; idx >= (int64_t)text_box->cursor; idx--) {
             if (text_box->str.str[idx] == '\r') {
@@ -645,11 +648,11 @@ static void Text_box_get_screen_xy_at_cursor(int64_t* screen_x, int64_t* screen_
             }
 
             getline_thing(getline_buf, &text_box->str.str[idx]);
-            fprintf(stderr, "            in for loop in Text_box_get_screen_xy_at_cursor: decrement general screen_y: %zi    char: %x %c str_starting_at_char: \"%s\"\n", *screen_y, text_box->str.str[idx], text_box->str.str[idx], getline_buf);
+            //fprintf(stderr, "            in for loop in Text_box_get_screen_xy_at_cursor: decrement general screen_y: %zi    char: %x %c str_starting_at_char: \"%s\"\n", *screen_y, text_box->str.str[idx], text_box->str.str[idx], getline_buf);
 
             if (text_box->str.str[idx] == '\n') {
                 //if (*screen_y == 0 || idx + 1 >= text_box->cursor) {
-                fprintf(stderr, "            in for loop in Text_box_get_screen_xy_at_cursor: decrement screen_y: %zi    char: %x %c\n", *screen_y, text_box->str.str[idx], text_box->str.str[idx]);
+                //fprintf(stderr, "            in for loop in Text_box_get_screen_xy_at_cursor: decrement screen_y: %zi    char: %x %c\n", *screen_y, text_box->str.str[idx], text_box->str.str[idx]);
                 //}
                 (*screen_y)--;
                 *screen_x = 0;
@@ -661,7 +664,7 @@ static void Text_box_get_screen_xy_at_cursor(int64_t* screen_x, int64_t* screen_
             }
         }
 
-        fprintf(stderr, "        EXITING for loop in Text_box_get_screen_xy_at_cursor: decrement general\n");
+        //fprintf(stderr, "        EXITING for loop in Text_box_get_screen_xy_at_cursor: decrement general\n");
 
         //assert((idx == 0 || text_box->str.str[idx - 1] == '\n') && "cursor_x != 0; non-zero cursor_x is not implemented");
 
@@ -674,20 +677,20 @@ static void Text_box_get_screen_xy_at_cursor(int64_t* screen_x, int64_t* screen_
 
             if (text_box->str.str[idx] == '\n') {
                 if (*screen_y == 0 || idx + 1 >= (int64_t)text_box->cursor) {
-                    fprintf(stderr, "        in for loop in Text_box_get_screen_xy_at_cursor: increment screen_y: %zi    char: %x %c\n", *screen_y, text_box->str.str[idx], text_box->str.str[idx]);
+                    //fprintf(stderr, "        in for loop in Text_box_get_screen_xy_at_cursor: increment screen_y: %zi    char: %x %c\n", *screen_y, text_box->str.str[idx], text_box->str.str[idx]);
                 }
                 (*screen_y)++;
                 *screen_x = 0;
             } else {
                 if (*screen_y == 0 || idx + 1 >= (int64_t)text_box->cursor) {
-                    fprintf(stderr, "        in for loop in Text_box_get_screen_xy_at_cursor: increment screen_x: %zu    char: %x %c\n", *screen_x, text_box->str.str[idx], text_box->str.str[idx]);
+                    //fprintf(stderr, "        in for loop in Text_box_get_screen_xy_at_cursor: increment screen_x: %zu    char: %x %c\n", *screen_x, text_box->str.str[idx], text_box->str.str[idx]);
                 }
                 (*screen_x)++;
             }
         }
     }
 
-    fprintf(stderr, "    exiting Editor_get_xy_at_cursor: Editor_get_index_scroll_offset()\n");
+    //fprintf(stderr, "    exiting Editor_get_xy_at_cursor: Editor_get_index_scroll_offset()\n");
 }
 
 static void Text_box_scroll_if_nessessary_alt(Text_box* text_box, int64_t main_window_height, int64_t main_window_width) {
@@ -702,12 +705,12 @@ static void Text_box_scroll_if_nessessary_alt(Text_box* text_box, int64_t main_w
 
     if (screen_y >= main_window_height) {
         //fprintf(stderr, "Text_box_scroll_if_nessessary(): main_window_height: %zu\n", main_window_height);
-        fprintf(stderr, "did increment before increment: Text_box_scroll_if_nessessary(): screen_y: %zu\n", screen_y);
+        //fprintf(stderr, "did increment before increment: Text_box_scroll_if_nessessary(): screen_y: %zu\n", screen_y);
         text_box->scroll_y += screen_y - main_window_height + 1;
-        fprintf(stderr, "did increment after increment: Text_box_scroll_if_nessessary(): screen_y - main_window_height + 1: %zu\n", screen_y - main_window_height + 1);
+        //fprintf(stderr, "did increment after increment: Text_box_scroll_if_nessessary(): screen_y - main_window_height + 1: %zu\n", screen_y - main_window_height + 1);
     } else {
         //fprintf(stderr, "Text_box_scroll_if_nessessary(): main_window_height: %zu\n", main_window_height);
-        fprintf(stderr, "not increment: Text_box_scroll_if_nessessary(): screen_y: %zu\n", screen_y);
+        //fprintf(stderr, "not increment: Text_box_scroll_if_nessessary(): screen_y: %zu\n", screen_y);
     }
 
     if (screen_x >= main_window_width) {
@@ -716,11 +719,11 @@ static void Text_box_scroll_if_nessessary_alt(Text_box* text_box, int64_t main_w
 }
 
 static void Text_box_scroll_if_nessessary(Text_box* text_box, int64_t main_window_height, int64_t main_window_width) {
-    fprintf(stderr, "entering Text_box_scroll_if_nessessary(): main_window_height: %zu\n", main_window_height);
+    //fprintf(stderr, "entering Text_box_scroll_if_nessessary(): main_window_height: %zu\n", main_window_height);
     int64_t screen_x;
     int64_t screen_y;
     Text_box_get_screen_xy_at_cursor(&screen_x, &screen_y, text_box);
-    fprintf(stderr, "in Text_box_scroll_if_nessessary(): screen_x: %zu    screen_y: %zu\n", screen_x, screen_y);
+    //fprintf(stderr, "in Text_box_scroll_if_nessessary(): screen_x: %zu    screen_y: %zu\n", screen_x, screen_y);
 
     while (screen_y >= main_window_height) {
         text_box->scroll_y += 1;
@@ -744,11 +747,32 @@ static void Text_box_scroll_if_nessessary(Text_box* text_box, int64_t main_windo
         assert(false && "not implemented");
     }
 
-    fprintf(stderr, "exiting Text_box_scroll_if_nessessary(): main_window_height: %zu\n", main_window_height);
+    //fprintf(stderr, "exiting Text_box_scroll_if_nessessary(): main_window_height: %zu\n", main_window_height);
 }
 
-static void draw_cursor(WINDOW* window, int64_t window_height, int64_t window_width, const Text_box* text_box) {
-    fprintf(stderr, "entering draw_cursor() \n");
+static void draw_cursor(WINDOW* window, int64_t window_height, int64_t window_width, const Text_box* text_box, STATE editor_state) {
+    (void) editor_state;
+    /*
+    switch (editor_state) {
+        case STATE_INSERT: {
+            if (ERR == curs_set(2)) {
+                if (ERR == curs_set(1)) {
+                    assert(false);
+                }
+            }
+        } break;
+        case STATE_COMMAND: //fallthrough
+        case STATE_SEARCH: //fallthrough
+        case STATE_QUIT_CONFIRM:
+            //curs_set(0);
+            break;
+        default:
+            assert(false && "unreachable");
+            abort();
+    }
+    */
+
+    //fprintf(stderr, "entering draw_cursor() \n");
     if (text_box->scroll_x > 0) {
         assert(false && "not implemented");
     }
@@ -756,14 +780,12 @@ static void draw_cursor(WINDOW* window, int64_t window_height, int64_t window_wi
     int64_t screen_x;
     int64_t screen_y;
     Text_box_get_screen_xy_at_cursor(&screen_x, &screen_y, text_box);
-    fprintf(stderr, "draw_screen: screen_y: %zu\n", screen_y);
-    fprintf(stderr, "draw_scroll: scroll_y: %zu\n", text_box->scroll_y);
     assert(window_width >= 1);
     assert(window_height >= 1);
     assert(screen_x < window_width);
     assert(screen_y < window_height);
     wmove(window, screen_y, screen_x);
-    fprintf(stderr, "exiting draw_cursor() \n");
+
 }
 
 static bool Editor_init(Editor* editor) {
@@ -778,7 +800,7 @@ static void Editor_free(Editor* editor) {
 }
 
 static void draw_main_window(WINDOW* window, const Editor* editor) {
-    fprintf(stderr, "entering draw_main_window()\n");
+    //fprintf(stderr, "entering draw_main_window()\n");
     if (editor->file_text.scroll_x > 0) {
         assert(false && "not implemented");
     }
@@ -790,10 +812,10 @@ static void draw_main_window(WINDOW* window, const Editor* editor) {
         mvwprintw(window, 0, 0, "%.*s\n", editor->file_text.str.count, editor->file_text.str.str + index);
     }
 
-    fprintf(stderr, "exiting draw_main_window()\n");
+    //fprintf(stderr, "exiting draw_main_window()\n");
 }
 
-static void draw_info_window(WINDOW* info_window, String info_general, String info_save, String search_query) {
+static void draw_info_window(WINDOW* info_window, String info_general, String info_save, String search_query, size_t search_cursor) {
     mvwprintw(
         info_window,
         0,
@@ -806,6 +828,7 @@ static void draw_info_window(WINDOW* info_window, String info_general, String in
         search_query.count,
         search_query.str
     );
+    mvwchgat(info_window, 2, search_cursor, 1, A_REVERSE, 0, NULL);
 }
 
 static WINDOW* get_newwin(int height, int width, int starty, int startx) {
@@ -842,7 +865,7 @@ static void parse_args(Editor* editor, int argc, char** argv) {
     for (;curr_arg_idx < argc; curr_arg_idx++) {
         FILE* f = fopen(argv[curr_arg_idx], "r");
         if (!f) {
-            fprintf(stderr, "error: could not open file %s: errno %d: %s\n", argv[curr_arg_idx], errno, strerror(errno));
+            //fprintf(stderr, "error: could not open file %s: errno %d: %s\n", argv[curr_arg_idx], errno, strerror(errno));
         } else {
             int curr_char = getc(f);
             while (!feof(f)) {
@@ -989,23 +1012,21 @@ int main(int argc, char** argv) {
         clear();    // erase();
 
         // scroll if nessessary
-        // TODO: see if this function works before checking draw_cursor
         Text_box_scroll_if_nessessary(&editor.file_text, windows->main_height, windows->main_width);
+        //wmove(windows->info_window, 0, 0);
         
         draw_main_window(windows->main_window, &editor);
-        draw_info_window(windows->info_window, editor.general_info.str, editor.save_info.str, editor.search_query.str);
+        draw_info_window(windows->info_window, editor.general_info.str, editor.save_info.str, editor.search_query.str, editor.search_query.cursor);
         wrefresh(windows->main_window);
         wrefresh(windows->info_window);
 
         // position and draw cursor
-        draw_cursor(windows->main_window, windows->main_height, windows->main_width, &editor.file_text);
+        draw_cursor(windows->main_window, windows->main_height, windows->main_width, &editor.file_text, editor.state);
+        //draw_cursor(windows->info_window, windows->info_height, windows->info_width, &editor.search_query);
 
         // get and process next keystroke
         process_next_input(windows, &editor, &should_close);
-        // cursor is set correctly in processing input
-        fprintf(stderr, "cursor after process_next_input: %zu\n", editor.file_text.cursor);
         assert(editor.file_text.cursor < editor.file_text.str.count + 1);
-        fprintf(stderr, "---AFTER PROCESS NEXT INPUT---\n");
     }
     endwin();
 

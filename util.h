@@ -88,7 +88,7 @@ static void String_append(String* string, int new_ch) {
 }
 
 static bool String_del(String* string, size_t index) {
-    fprintf(stderr, "String_del: index: %zu    string->count: %zu\n", index, string->count);
+    //fprintf(stderr, "String_del: index: %zu    string->count: %zu\n", index, string->count);
     assert(index < string->count);
     memmove(string->str + index, string->str + index + 1, string->count - index - 1);
     string->count--;
