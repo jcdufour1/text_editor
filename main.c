@@ -224,32 +224,46 @@ static void Windows_do_resize(Windows* windows) {
     mvwin(windows->info_window, windows->main_height, 0);
 }
 
-static bool save_file(const Editor* editor) {
-    // TODO: confirm that temp_file_name does not already exist
-    const char* temp_file_name = "temp_thingyksdjfaijdfkj.txt";
-    FILE* temp_file = fopen(temp_file_name, "wb");
-    if (!temp_file) {
+static bool actual_write(const char* dest_file_name, const char* data, size_t data_size) {
+    FILE* dest_file = fopen(dest_file_name, "wb");
+    if (!dest_file) {
         assert(false && "not implemented");
         //return false;
         exit(1);
     }
 
-    // write temp file
     ssize_t total_amount_written = 0;
     ssize_t amount_written;
     do {
-        amount_written = fwrite(editor->file_text.str.str + total_amount_written, 1, editor->file_text.str.count, temp_file);
+        amount_written = fwrite(data + total_amount_written, 1, data_size, dest_file);
         total_amount_written += amount_written;
         if (amount_written < 1) {
-            fprintf(stderr, "error: file %s could not be written: errno: %d: %s\n", "(not implemented)", errno, strerror(errno));
+            fprintf(stderr, "error: file %s could not be written: errno: %d: %s\n", dest_file_name, errno, strerror(errno));
+            fclose(dest_file);
             return false;
         }
-    } while(total_amount_written < (ssize_t)editor->file_text.str.count);
+    } while(total_amount_written < (ssize_t)data_size);
 
-    // copy from temp to actual file destination
-    if (0 > rename(temp_file_name, editor->file_name)) {
-        fprintf(stderr, "error: file %s could not be written: errno: %d: %s\n", "(not implemented)", errno, strerror(errno));
+    fclose(dest_file);
+    return true;
+}
+
+static bool save_file(const Editor* editor) {
+    // TODO: confirm that temp_file_name does not already exist
+    const char* temp_file_name = ".temp_thingyksdjfaijdfkj.txt";
+
+    // write temporary file
+    if (!actual_write(temp_file_name, editor->file_text.str.str, editor->file_text.str.count)) {
+        return false;
     }
+
+    // write actual file
+    // TODO: consider if this can be done better
+    if (!actual_write(editor->file_name, editor->file_text.str.str, editor->file_text.str.count)) {
+        return false;
+    }
+
+    //if (0 > rename(temp_file_name, editor->file_name)) {
 
     return true;
 }
@@ -838,18 +852,31 @@ static void parse_args(Editor* editor, int argc, char** argv) {
         assert(false && "not implemented");
     }
     for (;curr_arg_idx < argc; curr_arg_idx++) {
-        FILE* f = fopen(argv[curr_arg_idx], "r");
-        if (!f) {
-            //fprintf(stderr, "error: could not open file %s: errno %d: %s\n", argv[curr_arg_idx], errno, strerror(errno));
-        } else {
-            int curr_char = getc(f);
-            while (!feof(f)) {
-                Text_box_append(&editor->file_text, curr_char);
-                curr_char = getc(f);
-            }
-            fclose(f);
-            editor->file_name = argv[curr_arg_idx];
+        if (0 != access(argv[curr_arg_idx], R_OK)) {
+            fprintf(stderr, "error: could not read file %s: errno %d: %s\n", argv[curr_arg_idx], errno, strerror(errno));
+            continue;
         }
+
+        if (0 != access(argv[curr_arg_idx], F_OK)) {
+            fprintf(stderr, "note: creating new file %s\n", argv[curr_arg_idx]);
+            editor->file_name = argv[curr_arg_idx];
+            continue;
+        }
+
+        fprintf(stderr, "note: opening file %s\n", argv[curr_arg_idx]);
+        FILE* f = fopen(argv[curr_arg_idx], "r");
+        //open(argv[curr_arg_idx], O_RDONLY | O_CREAT);
+        if (!f) {
+            fprintf(stderr, "error: could not open file %s: errno %d: %s\n", argv[curr_arg_idx], errno, strerror(errno));
+            continue;
+        }
+        int curr_char = getc(f);
+        while (!feof(f)) {
+            Text_box_append(&editor->file_text, curr_char);
+            curr_char = getc(f);
+        }
+        fclose(f);
+        editor->file_name = argv[curr_arg_idx];
     }
     editor->unsaved_changes = false;
     const char* no_changes_text = "no changes";
