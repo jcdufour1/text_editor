@@ -11,8 +11,8 @@
 #include "util.h"
 
 // TODO: add undo/redo
-// TODO: add search
-// TODO: fix issue of scroll sometimes scrolling two lines instead of one
+// TODO: add scroll up
+// TODO: speed up scrolling/searching
 
 typedef enum {STATE_INSERT = 0, STATE_COMMAND, STATE_SEARCH, STATE_QUIT_CONFIRM} STATE;
 
@@ -516,9 +516,11 @@ static void String_get_curr_line(char* buf, const String* string, size_t startin
 
 }
 
-static void Text_box_get_index_scroll_offset(size_t* index, const Text_box* text_box) {
+static void Text_box_get_index_scroll_offset(size_t* index, const Text_box* text_box, bool do_log) {
     // index will be set to the index of the beginning of the line at text_box->scroll_x
-    fprintf(stderr, "        starting Text_box_get_index_scroll_offset() text_box->scroll_y: %zu\n", text_box->scroll_y);
+    if (do_log) {
+        fprintf(stderr, "        starting Text_box_get_index_scroll_offset() text_box->scroll_y: %zu\n", text_box->scroll_y);
+    }
     if (text_box->scroll_x > 0) {
         assert(false && "not implemented");
     }
@@ -528,82 +530,111 @@ static void Text_box_get_index_scroll_offset(size_t* index, const Text_box* text
     if (text_box->str.count < 1) {
         return;
     }
-    fprintf(stderr, "        in Text_box_get_index_scroll_offset: index: %zu    char: '%c'\n", *index, text_box->str.str[*index]);
+    if (do_log) {
+        fprintf(stderr, "        in Text_box_get_index_scroll_offset: index: %zu    char: '%c'\n", *index, text_box->str.str[*index]);
+    }
     for (size_t curr_y = 0; curr_y < text_box->scroll_y; curr_y++) {
         //String_get_curr_line(curr_line, &text_box->str, *index);
         //assert(strlen(curr_line) > 1);
         if (!get_index_start_next_line(index, text_box, *index)) {
             assert(false);
         }
-        /*
-        switch (curr_y) {
-            case 0:
-                assert('j' == text_box->str.str[*index]);
-                break;
-            case 1:
-                assert('d' == text_box->str.str[*index]);
-                break;
-            default:
-                assert(false && "not impelmetneed");
+        if (do_log) {
+            fprintf(stderr, "        in Text_box_get_index_scroll_offset: curr_y: %zu    index: %zu    char: '%c'\n", curr_y, *index, text_box->str.str[*index]);
         }
-        */
-        fprintf(stderr, "        in Text_box_get_index_scroll_offset: curr_y: %zu    index: %zu    char: '%c'\n", curr_y, *index, text_box->str.str[*index]);
-
-        //if (curr_y + 1 < 0) {
-            //(*index)++;
-        //}
     }
 
-    /*
-    switch (text_box->str.str[*index]) {
-        case 0:
-            assert('a' == text_box->str.str[*index]);
-            break;
-        default:
-            assert(text_box->str.str[*index - 1] == '\n');
-            break;
+    if (do_log) {
+        fprintf(stderr, "        end Text_box_get_index_scroll_offset() text_box->scroll_y: %zu    result: %zu\n", text_box->scroll_y, *index);
     }
-    */
-
-    fprintf(stderr, "        end Text_box_get_index_scroll_offset() text_box->scroll_y: %zu    result: %zu\n", text_box->scroll_y, *index);
 }
 
-static void Text_box_get_screen_xy_at_cursor(size_t* screen_x, size_t* screen_y, const Text_box* text_box) {
+#define GETLINE_BUF_SIZE 10000
+
+static char getline_buf[GETLINE_BUF_SIZE];
+
+void getline_thing(char* buf, const char* str) {
+    // buf will not include newline char
+    memset(buf, 0, GETLINE_BUF_SIZE);
+
+    for (size_t idx = 0; str[idx] && str[idx] != '\n'; idx++) {
+        buf[idx] = str[idx];
+    }
+}
+
+static void Text_box_get_screen_xy_at_cursor(int64_t* screen_x, int64_t* screen_y, const Text_box* text_box) {
     fprintf(stderr, "    entering Editor_get_xy_at_cursor: Editor_get_index_scroll_offset()\n");
     if (text_box->scroll_x > 0) {
         assert(false && "not implemented");
     }
 
     size_t scroll_offset;
-    Text_box_get_index_scroll_offset(&scroll_offset, text_box);
+    Text_box_get_index_scroll_offset(&scroll_offset, text_box, false);
     fprintf(stderr, "    in Editor_get_xy_at_cursor: Editor_get_index_scroll_offset() result: %zu\n", scroll_offset);
     *screen_x = 0;
     *screen_y = 0;
-    for (size_t idx = scroll_offset; idx < text_box->cursor; idx++) {
-        if (text_box->str.str[idx] == '\r') {
-            assert(false && "not implemented");
+    if (scroll_offset > text_box->cursor) {
+        Text_box_get_index_scroll_offset(&scroll_offset, text_box, true);
+        const char char_at_cursor = text_box->str.str[text_box->cursor];
+        fprintf(
+            stderr, 
+            "        ENTERING for loop in Text_box_get_screen_xy_at_cursor: decrement general    scroll_offset: %zu    char at cursor: '%c'\n", scroll_offset, char_at_cursor
+        );
+        int64_t idx;
+        for (idx = scroll_offset; idx >= (int64_t)text_box->cursor; idx--) {
+            if (text_box->str.str[idx] == '\r') {
+                assert(false && "not implemented");
+            }
+
+            getline_thing(getline_buf, &text_box->str.str[idx]);
+            fprintf(stderr, "            in for loop in Text_box_get_screen_xy_at_cursor: decrement general screen_y: %zi    char: %x %c str_starting_at_char: \"%s\"\n", *screen_y, text_box->str.str[idx], text_box->str.str[idx], getline_buf);
+
+            if (text_box->str.str[idx] == '\n') {
+                //if (*screen_y == 0 || idx + 1 >= text_box->cursor) {
+                fprintf(stderr, "            in for loop in Text_box_get_screen_xy_at_cursor: decrement screen_y: %zi    char: %x %c\n", *screen_y, text_box->str.str[idx], text_box->str.str[idx]);
+                //}
+                (*screen_y)--;
+                *screen_x = 0;
+            } else {
+                //if (*screen_y == 0 || idx + 1 >= text_box->cursor) {
+                //    fprintf(stderr, "        in for loop in Text_box_get_screen_xy_at_cursor: increment screen_x: %zu    char: %x %c\n", *screen_x, text_box->str.str[idx], text_box->str.str[idx]);
+                //}
+                //(*screen_x)++;
+            }
         }
 
-        if (text_box->str.str[idx] == '\n') {
-            if (*screen_y == 0 || idx + 1 >= text_box->cursor) {
-                fprintf(stderr, "        in for loop in Text_box_get_screen_xy_at_cursor: increment screen_y: %zu    char: %x %c\n", *screen_y, text_box->str.str[idx], text_box->str.str[idx]);
+        fprintf(stderr, "        EXITING for loop in Text_box_get_screen_xy_at_cursor: decrement general\n");
+
+        //assert((idx == 0 || text_box->str.str[idx - 1] == '\n') && "cursor_x != 0; non-zero cursor_x is not implemented");
+
+    } else {
+
+        for (int64_t idx = scroll_offset; idx < (int64_t)text_box->cursor; idx++) {
+            if (text_box->str.str[idx] == '\r') {
+                assert(false && "not implemented");
             }
-            (*screen_y)++;
-            *screen_x = 0;
-        } else {
-            if (*screen_y == 0 || idx + 1 >= text_box->cursor) {
-                fprintf(stderr, "        in for loop in Text_box_get_screen_xy_at_cursor: increment screen_x: %zu    char: %x %c\n", *screen_x, text_box->str.str[idx], text_box->str.str[idx]);
+
+            if (text_box->str.str[idx] == '\n') {
+                if (*screen_y == 0 || idx + 1 >= (int64_t)text_box->cursor) {
+                    fprintf(stderr, "        in for loop in Text_box_get_screen_xy_at_cursor: increment screen_y: %zi    char: %x %c\n", *screen_y, text_box->str.str[idx], text_box->str.str[idx]);
+                }
+                (*screen_y)++;
+                *screen_x = 0;
+            } else {
+                if (*screen_y == 0 || idx + 1 >= (int64_t)text_box->cursor) {
+                    fprintf(stderr, "        in for loop in Text_box_get_screen_xy_at_cursor: increment screen_x: %zu    char: %x %c\n", *screen_x, text_box->str.str[idx], text_box->str.str[idx]);
+                }
+                (*screen_x)++;
             }
-            (*screen_x)++;
         }
     }
 
     fprintf(stderr, "    exiting Editor_get_xy_at_cursor: Editor_get_index_scroll_offset()\n");
 }
 
-static void Text_box_scroll_if_nessessary_alt(Text_box* text_box, size_t main_window_height, size_t main_window_width) {
-    size_t screen_x;
-    size_t screen_y;
+static void Text_box_scroll_if_nessessary_alt(Text_box* text_box, int64_t main_window_height, int64_t main_window_width) {
+    int64_t screen_x;
+    int64_t screen_y;
     Text_box_get_screen_xy_at_cursor(&screen_x, &screen_y, text_box);
 
     //while (screen_y < main_window_width - 1) {
@@ -626,26 +657,30 @@ static void Text_box_scroll_if_nessessary_alt(Text_box* text_box, size_t main_wi
     }
 }
 
-static void Text_box_scroll_if_nessessary(Text_box* text_box, size_t main_window_height, size_t main_window_width) {
+static void Text_box_scroll_if_nessessary(Text_box* text_box, int64_t main_window_height, int64_t main_window_width) {
     fprintf(stderr, "entering Text_box_scroll_if_nessessary(): main_window_height: %zu\n", main_window_height);
-    size_t screen_x;
-    size_t screen_y;
+    int64_t screen_x;
+    int64_t screen_y;
     Text_box_get_screen_xy_at_cursor(&screen_x, &screen_y, text_box);
     fprintf(stderr, "in Text_box_scroll_if_nessessary(): screen_x: %zu    screen_y: %zu\n", screen_x, screen_y);
 
-    if (screen_y >= main_window_height) {
-        while (screen_y >= main_window_height) {
-            text_box->scroll_y += 1;
-            Text_box_get_screen_xy_at_cursor(&screen_x, &screen_y, text_box);
-        }
-        //fprintf(stderr, "Text_box_scroll_if_nessessary(): main_window_height: %zu\n", main_window_height);
-        fprintf(stderr, "did increment before increment: Text_box_scroll_if_nessessary(): screen_y: %zu\n", screen_y);
-        //text_box->scroll_y += screen_y - main_window_height + 1;
-        fprintf(stderr, "did increment after increment: Text_box_scroll_if_nessessary(): screen_y - main_window_height + 1: %zu\n", screen_y - main_window_height + 1);
-    } else {
-        //fprintf(stderr, "Text_box_scroll_if_nessessary(): main_window_height: %zu\n", main_window_height);
-        fprintf(stderr, "not increment: Text_box_scroll_if_nessessary(): screen_y: %zu\n", screen_y);
+    while (screen_y >= main_window_height) {
+        text_box->scroll_y += 1;
+        Text_box_get_screen_xy_at_cursor(&screen_x, &screen_y, text_box);
     }
+    while (screen_y < 0) {
+        text_box->scroll_y -= 1;
+        Text_box_get_screen_xy_at_cursor(&screen_x, &screen_y, text_box);
+    }
+    //size_t scroll_offset;
+    //Text_box_get_index_scroll_offset(&scroll_offset, text_box);
+    //assert(scroll_offset == text_box->cursor && "scroll unsuccessful");
+    //fprintf(stderr, "Text_box_scroll_if_nessessary(): main_window_height: %zu\n", main_window_height);
+    //fprintf(stderr, "did increment before increment: Text_box_scroll_if_nessessary(): screen_y: %zu\n", screen_y);
+    //text_box->scroll_y += screen_y - main_window_height + 1;
+    //fprintf(stderr, "did increment after increment: Text_box_scroll_if_nessessary(): screen_y - main_window_height + 1: %zu\n", screen_y - main_window_height + 1);
+    //fprintf(stderr, "Text_box_scroll_if_nessessary(): main_window_height: %zu\n", main_window_height);
+    //fprintf(stderr, "not increment: Text_box_scroll_if_nessessary(): screen_y: %zu\n", screen_y);
 
     if (screen_x >= main_window_width) {
         assert(false && "not implemented");
@@ -654,14 +689,14 @@ static void Text_box_scroll_if_nessessary(Text_box* text_box, size_t main_window
     fprintf(stderr, "exiting Text_box_scroll_if_nessessary(): main_window_height: %zu\n", main_window_height);
 }
 
-static void draw_cursor(WINDOW* window, size_t window_height, size_t window_width, const Text_box* text_box) {
+static void draw_cursor(WINDOW* window, int64_t window_height, int64_t window_width, const Text_box* text_box) {
     fprintf(stderr, "entering draw_cursor() \n");
     if (text_box->scroll_x > 0) {
         assert(false && "not implemented");
     }
 
-    size_t screen_x;
-    size_t screen_y;
+    int64_t screen_x;
+    int64_t screen_y;
     Text_box_get_screen_xy_at_cursor(&screen_x, &screen_y, text_box);
     fprintf(stderr, "draw_screen: screen_y: %zu\n", screen_y);
     fprintf(stderr, "draw_scroll: scroll_y: %zu\n", text_box->scroll_y);
@@ -691,7 +726,7 @@ static void draw_main_window(WINDOW* window, const Editor* editor) {
     }
 
     size_t index;
-    Text_box_get_index_scroll_offset(&index, &editor->file_text);
+    Text_box_get_index_scroll_offset(&index, &editor->file_text, false);
 
     if (editor->file_text.str.count > 0) {
         mvwprintw(window, 0, 0, "%.*s\n", editor->file_text.str.count, editor->file_text.str.str + index);
@@ -775,14 +810,14 @@ void test_Text_box_scroll_if_nessessary(void) {
     free(editor);
 }
 
-void test_template_Text_box_get_index_scroll_offset(const char* text, size_t scroll_x, size_t expected_offset) {
+void test_template_Text_box_get_index_scroll_offset(const char* text, size_t scroll_y, size_t expected_offset) {
     Text_box* text_box = safe_malloc(sizeof(*text_box));
     memset(text_box, 0, sizeof(*text_box));
 
     String_cpy_from_cstr(&text_box->str, text, sizeof(text));
-    text_box->scroll_x = scroll_x;
+    text_box->scroll_y = scroll_y;
     size_t index;
-    Text_box_get_index_scroll_offset(&index, text_box);
+    Text_box_get_index_scroll_offset(&index, text_box, false);
     assert(expected_offset == index && "test failed");
     free(text_box);
 }
@@ -847,7 +882,7 @@ void do_tests(void) {
 }
 
 int main(int argc, char** argv) {
-    //do_tests();
+    do_tests();
 
     Editor editor;
     Windows* windows = safe_malloc(sizeof(*windows));
