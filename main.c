@@ -686,7 +686,11 @@ static void Text_box_get_screen_xy_at_cursor(int64_t* screen_x, int64_t* screen_
                 if (*screen_y == 0 || idx + 1 >= (int64_t)text_box->cursor) {
                     //fprintf(stderr, "        in for loop in Text_box_get_screen_xy_at_cursor: increment screen_x: %zu    char: %x %c\n", *screen_x, text_box->str.str[idx], text_box->str.str[idx]);
                 }
-                (*screen_x)++;
+                if (text_box->str.str[idx] == '\t') {
+                    (*screen_x) += TABSIZE - ((*screen_x) % TABSIZE);
+                } else {
+                    (*screen_x)++;
+                }
             }
         }
     }
@@ -713,15 +717,6 @@ static void Text_box_scroll_if_nessessary(Text_box* text_box, int64_t main_windo
         text_box->scroll_y += screen_y;
         //fprintf(stderr, "after: text_box->scroll_y: %zu    screen_y: %zi\n", text_box->scroll_y, screen_y);
     }
-    //size_t scroll_offset;
-    //Text_box_get_index_scroll_offset(&scroll_offset, text_box);
-    //assert(scroll_offset == text_box->cursor && "scroll unsuccessful");
-    //fprintf(stderr, "Text_box_scroll_if_nessessary(): main_window_height: %zu\n", main_window_height);
-    //fprintf(stderr, "did increment before increment: Text_box_scroll_if_nessessary(): screen_y: %zu\n", screen_y);
-    //text_box->scroll_y += screen_y - main_window_height + 1;
-    //fprintf(stderr, "did increment after increment: Text_box_scroll_if_nessessary(): screen_y - main_window_height + 1: %zu\n", screen_y - main_window_height + 1);
-    //fprintf(stderr, "Text_box_scroll_if_nessessary(): main_window_height: %zu\n", main_window_height);
-    //fprintf(stderr, "not increment: Text_box_scroll_if_nessessary(): screen_y: %zu\n", screen_y);
 
     if (screen_x >= main_window_width) {
         assert(false && "not implemented");
