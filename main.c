@@ -18,8 +18,8 @@
 
 static const char* insert_text = "[insert]: press ctrl-I to enter command mode or exit";
 static const char* command_text = "[command]: press q to quit. press ctrl-I to go back to insert mode";
-static const char* search_text = "[search]: ";
-static const char* search_failure_text = "[search]: no results";
+static const char* search_text = "[search]: press ctrl-f to go to insert mode; ctrl-n or ctrl-p to go to next/previous result, ctrl-h for help";
+static const char* search_failure_text = "[search]: no results. press ctrl-h for help";
 static const char* quit_confirm_text = "Are you sure that you want to exit without saving? N/y";
 
 static void draw_cursor(WINDOW* window, int64_t window_height, int64_t window_width, const Text_box* text_box, ED_STATE editor_state) {
@@ -111,12 +111,12 @@ static void draw_info_window(WINDOW* info_window, const Editor* editor) {
         "%.*s\n%.*s\n%.*s\n",
         editor->general_info.str.count,
         editor->general_info.str.str,
-        editor->save_info.str.count,
-        editor->save_info.str.str,
         editor->search_query.str.count,
-        editor->search_query.str.str
+        editor->search_query.str.str,
+        editor->save_info.str.count,
+        editor->save_info.str.str
     );
-    mvwchgat(info_window, 2, editor->search_query.cursor, 1, A_REVERSE, 0, NULL);
+    mvwchgat(info_window, 1, editor->search_query.cursor, 1, A_REVERSE, 0, NULL);
 }
 
 static WINDOW* get_newwin(int height, int width, int starty, int startx) {
@@ -226,12 +226,7 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
         } break;
         case KEY_BACKSPACE: {
             if (editor->search_query.cursor > 0) {
-                if (Text_box_del(&editor->search_query, editor->search_query.cursor - 1)) {
-                } else {
-                }
-            } else {
-                editor->state = STATE_INSERT;
-                String_cpy_from_cstr(&editor->general_info.str, insert_text, strlen(insert_text));
+                Text_box_del(&editor->search_query, editor->search_query.cursor - 1);
             }
         } break;
         case ctrl('n'): // fallthrough
