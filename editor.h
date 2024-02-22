@@ -17,14 +17,15 @@ typedef struct {
     SEARCH_STATUS search_status;
 } Editor;
 
-static bool Editor_init(Editor* editor) {
-    memset(editor, 0, sizeof(Editor));
-    return true;
+static Editor* Editor_get() {
+    Editor* editor = safe_malloc(sizeof(*editor));
+    memset(editor, 0, sizeof(*editor));
+    return editor;
 }
 
 static void Editor_free(Editor* editor) {
     (void) editor;
-    //free(editor->file_text.str);
+    //free(editor->file_text.string);
     // TODO: actually implement this function
 }
 
@@ -33,13 +34,13 @@ static bool Editor_save_file(const Editor* editor) {
     const char* temp_file_name = ".temp_thingyksdjfaijdfkj.txt";
 
     // write temporary file
-    if (!actual_write(temp_file_name, editor->file_text.str.str, editor->file_text.str.count)) {
+    if (!actual_write(temp_file_name, editor->file_text.string.str, editor->file_text.string.count)) {
         return false;
     }
 
     // write actual file
     // TODO: consider if this can be done better
-    if (!actual_write(editor->file_name, editor->file_text.str.str, editor->file_text.str.count)) {
+    if (!actual_write(editor->file_name, editor->file_text.string.str, editor->file_text.string.count)) {
         return false;
     }
 
@@ -55,19 +56,19 @@ static void Editor_save(Editor* editor) {
 
     if (!Editor_save_file(editor)) {
         const char* file_error_text =  "error: file could not be saved";
-        String_cpy_from_cstr(&editor->save_info.str, file_error_text, strlen(file_error_text));
+        String_cpy_from_cstr(&editor->save_info.string, file_error_text, strlen(file_error_text));
         return;
     }
 
     const char* file_error_text = "file saved";
-    String_cpy_from_cstr(&editor->save_info.str, file_error_text, strlen(file_error_text));
+    String_cpy_from_cstr(&editor->save_info.string, file_error_text, strlen(file_error_text));
     editor->unsaved_changes = false;
 }
 
 static void Editor_insert_into_main_file_text(Editor* editor, int new_ch, size_t index) {
     if (!editor->unsaved_changes) {
         const char* unsaved_changes_text = "unsaved changes";
-        String_cpy_from_cstr(&editor->save_info.str, unsaved_changes_text, strlen(unsaved_changes_text));
+        String_cpy_from_cstr(&editor->save_info.string, unsaved_changes_text, strlen(unsaved_changes_text));
         editor->unsaved_changes = true;
     }
     Text_box_insert(&editor->file_text, new_ch, index);

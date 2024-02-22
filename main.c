@@ -51,7 +51,7 @@ static void draw_cursor(WINDOW* window, int64_t window_height, int64_t window_wi
 
     int64_t screen_x;
     int64_t screen_y;
-    Text_box_get_screen_xy_at_cursor(&screen_x, &screen_y, text_box);
+    Text_box_get_screen_xy(&screen_x, &screen_y, text_box);
     assert(window_width >= 1);
     assert(window_height >= 1);
     assert(screen_x < window_width);
@@ -96,8 +96,41 @@ static void draw_main_window(WINDOW* window, const Editor* editor) {
     size_t index;
     Text_box_get_index_scroll_offset(&index, &editor->file_text, false);
 
-    if (editor->file_text.str.count > 0) {
-        mvwprintw(window, 0, 0, "%.*s\n", editor->file_text.str.count, editor->file_text.str.str + index);
+    if (editor->file_text.string.count > 0) {
+        mvwprintw(window, 0, 0, "%.*s\n", editor->file_text.string.count, editor->file_text.string.str + index);
+    }
+
+    int64_t visual_x, visual_y;
+    Text_box_get_screen_xy_at_cursor_pos(&visual_x, &visual_y, &editor->file_text, editor->file_text.visual.start);
+    switch (editor->file_text.visual.state) {
+    case VIS_STATE_NONE:
+        fprintf(stderr, "draw_main_window: no\n");
+        break;
+    case VIS_STATE_START: // fallthrough
+    case VIS_STATE_END:
+        fprintf(
+            stderr,
+            "editor->file_text.visual.start: %zu      editor->file_text.visual.end: %zu\n",
+            editor->file_text.visual.start,
+            editor->file_text.visual.end
+        );
+        assert(editor->file_text.visual.end >= editor->file_text.visual.start);
+        for (int64_t idx_visual = editor->file_text.visual.start; idx_visual <= (int64_t)editor->file_text.visual.end; idx_visual++) {
+            Text_box_get_screen_xy_at_cursor_pos(&visual_x, &visual_y, &editor->file_text, idx_visual);
+            mvwchgat(
+                window,
+                visual_y,
+                visual_x,
+                1,
+                A_REVERSE,
+                0,
+                NULL
+            );
+        }
+        break;
+    default:
+        fprintf(stderr, "internal error\n");
+        abort();
     }
 
     //fprintf(stderr, "exiting draw_main_window()\n");
@@ -109,12 +142,12 @@ static void draw_info_window(WINDOW* info_window, const Editor* editor) {
         0,
         0,
         "%.*s\n%.*s\n%.*s\n",
-        editor->general_info.str.count,
-        editor->general_info.str.str,
-        editor->search_query.str.count,
-        editor->search_query.str.str,
-        editor->save_info.str.count,
-        editor->save_info.str.str
+        editor->general_info.string.count,
+        editor->general_info.string.str,
+        editor->search_query.string.count,
+        editor->search_query.string.str,
+        editor->save_info.string.count,
+        editor->save_info.string.str
     );
     mvwchgat(info_window, 1, editor->search_query.cursor, 1, A_REVERSE, 0, NULL);
 }
@@ -156,11 +189,14 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
         } break;
         case ctrl('i'): {
             editor->state = STATE_COMMAND;
-            String_cpy_from_cstr(&editor->general_info.str, command_text, strlen(command_text));
+            String_cpy_from_cstr(&editor->general_info.string, command_text, strlen(command_text));
         } break;
         case ctrl('f'): {
             editor->state = STATE_SEARCH;
-            String_cpy_from_cstr(&editor->general_info.str, search_text, strlen(search_text));
+            String_cpy_from_cstr(&editor->general_info.string, search_text, strlen(search_text));
+        } break;
+        case ctrl('q'): {
+            Text_box_toggle_visual_mode(&editor->file_text);
         } break;
         case ctrl('s'): {
             Editor_save(editor);
@@ -181,7 +217,7 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
             if (editor->file_text.cursor > 0) {
                 if (Text_box_del(&editor->file_text, editor->file_text.cursor - 1) && !editor->unsaved_changes) {
                     const char* unsaved_changes_text = "unsaved changes";
-                    String_cpy_from_cstr(&editor->save_info.str, unsaved_changes_text, strlen(unsaved_changes_text));
+                    String_cpy_from_cstr(&editor->save_info.string, unsaved_changes_text, strlen(unsaved_changes_text));
                     editor->unsaved_changes = true;
                 }
             }
@@ -202,11 +238,11 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
         } break;
         case ctrl('i'): {
             editor->state = STATE_INSERT;
-            String_cpy_from_cstr(&editor->general_info.str, insert_text, strlen(insert_text));
+            String_cpy_from_cstr(&editor->general_info.string, insert_text, strlen(insert_text));
         } break;
         case ctrl('f'): {
             editor->state = STATE_INSERT;
-            String_cpy_from_cstr(&editor->general_info.str, insert_text, strlen(insert_text));
+            String_cpy_from_cstr(&editor->general_info.string, insert_text, strlen(insert_text));
         } break;
         case ctrl('s'): {
             assert(false && "not implemented");
@@ -237,17 +273,17 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
                 break;
             case SEARCH_REPEAT:
                 editor->file_text.cursor++;
-                editor->file_text.cursor %= editor->file_text.str.count;
+                editor->file_text.cursor %= editor->file_text.string.count;
                 break;
             default:
                 assert(false && "unreachable");
                 abort();
             }
-            if (Text_box_do_search(&editor->file_text, &editor->search_query.str, SEARCH_DIR_FORWARDS)) {
+            if (Text_box_do_search(&editor->file_text, &editor->search_query.string, SEARCH_DIR_FORWARDS)) {
                 editor->search_status = SEARCH_REPEAT;
-                String_cpy_from_cstr(&editor->general_info.str, search_text, strlen(search_text));
+                String_cpy_from_cstr(&editor->general_info.string, search_text, strlen(search_text));
             } else {
-                String_cpy_from_cstr(&editor->general_info.str, search_failure_text, strlen(search_failure_text));
+                String_cpy_from_cstr(&editor->general_info.string, search_failure_text, strlen(search_failure_text));
             }
             //editor->state = STATE_INSERT;
             //String_cpy_from_cstr(&editor->general_info.str, insert_text, strlen(insert_text));
@@ -258,21 +294,21 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
                 break;
             case SEARCH_REPEAT:
                 if (editor->file_text.cursor == 0) {
-                    editor->file_text.cursor = editor->file_text.str.count - 1;
+                    editor->file_text.cursor = editor->file_text.string.count - 1;
                 } else {
                     editor->file_text.cursor--;
-                    editor->file_text.cursor %= editor->file_text.str.count;
+                    editor->file_text.cursor %= editor->file_text.string.count;
                 }
                 break;
             default:
                 assert(false && "unreachable");
                 abort();
             }
-            if (Text_box_do_search(&editor->file_text, &editor->search_query.str, SEARCH_DIR_BACKWARDS)) {
+            if (Text_box_do_search(&editor->file_text, &editor->search_query.string, SEARCH_DIR_BACKWARDS)) {
                 editor->search_status = SEARCH_REPEAT;
-                String_cpy_from_cstr(&editor->general_info.str, search_text, strlen(search_text));
+                String_cpy_from_cstr(&editor->general_info.string, search_text, strlen(search_text));
             } else {
-                String_cpy_from_cstr(&editor->general_info.str, search_failure_text, strlen(search_failure_text));
+                String_cpy_from_cstr(&editor->general_info.string, search_failure_text, strlen(search_failure_text));
             }
         } break;
         default: {
@@ -289,14 +325,14 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
         case 'q': {
             if (editor->unsaved_changes) {
                 editor->state = STATE_QUIT_CONFIRM;
-                String_cpy_from_cstr(&editor->general_info.str, quit_confirm_text, strlen(quit_confirm_text));
+                String_cpy_from_cstr(&editor->general_info.string, quit_confirm_text, strlen(quit_confirm_text));
             } else {
                 *should_close = true;
             }
         } break;
         case ctrl('i'): {
             editor->state = STATE_INSERT;
-            String_cpy_from_cstr(&editor->general_info.str, insert_text, strlen(insert_text));
+            String_cpy_from_cstr(&editor->general_info.string, insert_text, strlen(insert_text));
         } break;
         case 'w':   // fallthrough
         case 's':   // fallthrough
@@ -331,7 +367,7 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
         } break;
         default:
             editor->state = STATE_INSERT;
-            String_cpy_from_cstr(&editor->general_info.str, insert_text, strlen(insert_text));
+            String_cpy_from_cstr(&editor->general_info.string, insert_text, strlen(insert_text));
         } break;
     } break;
     }
@@ -371,7 +407,7 @@ static void parse_args(Editor* editor, int argc, char** argv) {
     }
     editor->unsaved_changes = false;
     const char* no_changes_text = "no changes";
-    String_cpy_from_cstr(&editor->save_info.str, no_changes_text, strlen(no_changes_text));
+    String_cpy_from_cstr(&editor->save_info.string, no_changes_text, strlen(no_changes_text));
     editor->file_text.cursor = 0;
 }
 
@@ -379,6 +415,7 @@ void test_Text_box_scroll_if_nessessary(void) {
     Editor* editor = safe_malloc(sizeof(*editor));
     memset(editor, 0, sizeof(*editor));
 
+    // TODO: implement this test?
     //Text_box_scroll_if_nessessary(&editor.file_text, windows->main_height, windows->main_width);
 
     free(editor);
@@ -388,7 +425,7 @@ void test_template_Text_box_get_index_scroll_offset(const char* text, size_t scr
     Text_box* text_box = safe_malloc(sizeof(*text_box));
     memset(text_box, 0, sizeof(*text_box));
 
-    String_cpy_from_cstr(&text_box->str, text, sizeof(text));
+    String_cpy_from_cstr(&text_box->string, text, sizeof(text));
     text_box->scroll_y = scroll_y;
     size_t index;
     Text_box_get_index_scroll_offset(&index, text_box, false);
@@ -416,7 +453,7 @@ void test_template_get_index_start_next_line(const char* test_string, size_t ind
     String test_text;
     Text_box text_box = {0};
     String_cpy_from_cstr(&test_text, test_string, strlen(test_string));
-    text_box.str = test_text;
+    text_box.string = test_text;
     get_index_start_next_line(&result, &text_box, index_before);
     assert(result == expected_result);
 }
@@ -458,17 +495,12 @@ void do_tests(void) {
 int main(int argc, char** argv) {
     do_tests();
 
-    Editor editor;
+    Editor* editor = Editor_get();
     Windows* windows = safe_malloc(sizeof(*windows));
     Windows_init(windows);
 
-    if (!Editor_init(&editor)) {
-        fprintf(stderr, "fetal error: could not initialize editor\n");
-        exit(1);
-    }
-
     //set_escdelay(100);
-    parse_args(&editor, argc, argv);
+    parse_args(editor, argc, argv);
 
     initscr();
 	keypad(stdscr, TRUE);		/* We get F1, F2 etc..		*/
@@ -494,9 +526,9 @@ int main(int argc, char** argv) {
 
     windows->info_window = get_newwin(windows->info_height, windows->info_width, windows->main_height, 0);
 
-    String_cpy_from_cstr(&editor.general_info.str, insert_text, strlen(insert_text));
+    String_cpy_from_cstr(&editor->general_info.string, insert_text, strlen(insert_text));
 
-    Text_box_scroll_if_nessessary(&editor.file_text, windows->main_height, windows->main_width);
+    Text_box_scroll_if_nessessary(&editor->file_text, windows->main_height, windows->main_width);
 
     bool should_close = false;
     bool should_resize_window = false;
@@ -509,25 +541,24 @@ int main(int argc, char** argv) {
         }
 
         // scroll if nessessary
-        Text_box_scroll_if_nessessary(&editor.file_text, windows->main_height, windows->main_width);
+        Text_box_scroll_if_nessessary(&editor->file_text, windows->main_height, windows->main_width);
         //wmove(windows->info_window, 0, 0);
         
-        draw_main_window(windows->main_window, &editor);
-        draw_info_window(windows->info_window, &editor);
+        draw_main_window(windows->main_window, editor);
+        draw_info_window(windows->info_window, editor);
         wrefresh(windows->main_window);
         wrefresh(windows->info_window);
 
         // position and draw cursor
-        draw_cursor(windows->main_window, windows->main_height, windows->main_width, &editor.file_text, editor.state);
-        //draw_cursor(windows->info_window, windows->info_height, windows->info_width, &editor.search_query);
+        draw_cursor(windows->main_window, windows->main_height, windows->main_width, &editor->file_text, editor->state);
 
         // get and process next keystroke
-        process_next_input(&should_resize_window, windows, &editor, &should_close);
-        assert(editor.file_text.cursor < editor.file_text.str.count + 1);
+        process_next_input(&should_resize_window, windows, editor, &should_close);
+        assert(editor->file_text.cursor < editor->file_text.string.count + 1);
     }
     endwin();
 
-    Editor_free(&editor);
+    Editor_free(editor);
     Windows_free(windows);
 
     return 0;
