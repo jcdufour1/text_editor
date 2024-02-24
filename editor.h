@@ -113,8 +113,8 @@ static void Editor_save(Editor* editor) {
         return;
     }
 
-    const char* file_error_text = "file saved";
-    String_cpy_from_cstr(&editor->save_info.string, file_error_text, strlen(file_error_text));
+    const char* file_success_text = "file saved";
+    String_cpy_from_cstr(&editor->save_info.string, file_success_text, strlen(file_success_text));
     editor->unsaved_changes = false;
 }
 

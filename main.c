@@ -12,12 +12,11 @@
 #include "editor.h"
 #include "text_box.h"
 
-// TODO: add redo
 // TODO: speed up scrolling/searching
 // TODO: make visual mode part of Text_box?
 // TODO: text wrap (things are broken when there is text wrap)
 // TODO: backward search does not actually check first letter of query
-// TODO: display info text when copying
+// TODO: set info text to say "copying", etc. when copying
 
 typedef struct {
     int height;

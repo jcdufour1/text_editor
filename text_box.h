@@ -228,7 +228,7 @@ static bool Text_box_do_search(Text_box* text_box_to_search, const String* query
 
             bool string_at_idx = true;
 
-            for (int64_t query_idx = query->count - 1; query_idx > 0; query_idx--) {
+            for (int64_t query_idx = query->count - 1; query_idx >= 0; query_idx--) {
                 assert((idx_to_search + query_idx) - (int64_t)query->count >= 0);
                 if (text_box_to_search->string.str[(idx_to_search + query_idx) - query->count] != query->str[query_idx]) {
                     string_at_idx = false;
