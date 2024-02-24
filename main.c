@@ -176,20 +176,6 @@ static void Windows_init(Windows* windows) {
     memset(windows, 0, sizeof(*windows));
 }
 
-static void Editor_cpy_selection(Editor* editor) {
-    String_cpy_from_substring(
-        &editor->clipboard,
-        &editor->file_text.string,
-        editor->file_text.visual.start,
-        editor->file_text.visual.end + 1 - editor->file_text.visual.start
-    );
-}
-
-static void Editor_paste_selection(Editor* editor) {
-    //fprintf(stderr, "Editor_paste_selection: clipboard: \"%.*s\"\n", (int)editor->clipboard.count, editor->clipboard.str);
-    String_insert_string(&editor->file_text.string, editor->file_text.cursor, &editor->clipboard);
-}
-
 static void process_next_input(bool* should_resize_window, Windows* windows, Editor* editor, bool* should_close) {
     *should_resize_window = false;
 

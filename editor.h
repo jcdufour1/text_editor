@@ -92,6 +92,20 @@ static void Editor_save(Editor* editor) {
     editor->unsaved_changes = false;
 }
 
+static void Editor_cpy_selection(Editor* editor) {
+    String_cpy_from_substring(
+        &editor->clipboard,
+        &editor->file_text.string,
+        editor->file_text.visual.start,
+        editor->file_text.visual.end + 1 - editor->file_text.visual.start
+    );
+}
+
+static void Editor_paste_selection(Editor* editor) {
+    //fprintf(stderr, "Editor_paste_selection: clipboard: \"%.*s\"\n", (int)editor->clipboard.count, editor->clipboard.str);
+    String_insert_string(&editor->file_text.string, editor->file_text.cursor, &editor->clipboard);
+}
+
 static void Editor_insert_into_main_file_text(Editor* editor, int new_ch, size_t index) {
     if (!editor->unsaved_changes) {
         const char* unsaved_changes_text = "unsaved changes";
