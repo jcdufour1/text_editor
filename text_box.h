@@ -2,6 +2,7 @@
 #define TEXT_BOX_H
 
 #include "util.h"
+#include "new_string.h"
 
 typedef enum {DIR_UP, DIR_DOWN, DIR_RIGHT, DIR_LEFT} DIRECTION;
 
@@ -91,16 +92,16 @@ static size_t len_curr_line(const Text_box* text, size_t curr_cursor) {
     return curr_cursor - initial_cursor;
 }
 
-static bool Text_box_del(Text_box* editor, size_t index) {
-    if (editor->string.count < 1) {
+static bool Text_box_del(Text_box* text_box, size_t index) {
+    if (text_box->string.count < 1) {
         return false;
     }
 
-    assert(editor->cursor > 0);
-    editor->cursor--;
-    editor->user_max_col = editor->cursor - get_index_start_curr_line(editor, editor->cursor);
+    assert(text_box->cursor > 0);
+    text_box->cursor--;
+    text_box->user_max_col = text_box->cursor - get_index_start_curr_line(text_box, text_box->cursor);
 
-    return String_del(&editor->string, index);
+    return String_del(&text_box->string, index);
 }
 
 static void Text_box_insert(Text_box* text_box, int new_ch, size_t index) {

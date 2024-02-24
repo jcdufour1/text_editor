@@ -12,20 +12,12 @@
 #include "editor.h"
 #include "text_box.h"
 
-// TODO: add undo/redo
+// TODO: add redo
 // TODO: speed up scrolling/searching
 // TODO: make visual mode part of Text_box?
 // TODO: text wrap (things are broken when there is text wrap)
 // TODO: backward search does not actually check first letter of query
 // TODO: display info text when copying
-
-static const char* insert_text = "[insert]: press ctrl-I to enter command mode or exit";
-static const char* command_text = "[command]: press q to quit. press ctrl-I to go back to insert mode";
-static const char* search_text = "[search]: press ctrl-f to go to insert mode; "
-                                 "ctrl-n or ctrl-p to go to next/previous result; " 
-                                 "ctrl-h for help";
-static const char* search_failure_text = "[search]: no results. press ctrl-h for help";
-static const char* quit_confirm_text = "Are you sure that you want to exit without saving? N/y";
 
 typedef struct {
     int height;
@@ -85,8 +77,8 @@ static void Windows_do_resize(Windows* windows) {
     windows->main.height = windows->total_height - INFO_HEIGHT - 1;
     windows->main.width = windows->total_width;
 
-    windows->main.height = INFO_HEIGHT;
-    windows->main.width = windows->total_width;
+    windows->info.height = INFO_HEIGHT;
+    windows->info.width = windows->total_width;
 
     wresize(windows->main.window, windows->main.height, windows->main.width);
     wresize(windows->info.window, windows->info.height, windows->info.width);
@@ -194,13 +186,15 @@ static void Editor_cpy_selection(Editor* editor) {
 }
 
 static void Editor_paste_selection(Editor* editor) {
-    fprintf(stderr, "Editor_paste_selection: clipboard: \"%.*s\"\n", (int)editor->clipboard.count, editor->clipboard.str);
+    //fprintf(stderr, "Editor_paste_selection: clipboard: \"%.*s\"\n", (int)editor->clipboard.count, editor->clipboard.str);
     String_insert_string(&editor->file_text.string, editor->file_text.cursor, &editor->clipboard);
 }
 
 static void process_next_input(bool* should_resize_window, Windows* windows, Editor* editor, bool* should_close) {
     *should_resize_window = false;
+
     switch (editor->state) {
+
     case STATE_INSERT: {
         int new_ch = wgetch(windows->main.window);
         switch (new_ch) {
@@ -227,6 +221,15 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
         case ctrl('v'): {
             Editor_paste_selection(editor);
         } break;
+        case ctrl('z'): {
+            if (editor->actions.count < 1) {
+                const char* undo_failure_text = "already at oldest change";
+                String_cpy_from_cstr(&editor->general_info.string, undo_failure_text, strlen(undo_failure_text));
+                editor->gen_info_state = GEN_INFO_OLDEST_CHANGE;
+                break;
+            }
+            Editor_undo(editor);
+        } break;
         case KEY_LEFT: {
             Text_box_move_cursor(&editor->file_text, DIR_LEFT);
         } break;
@@ -241,11 +244,7 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
         } break;
         case KEY_BACKSPACE: {
             if (editor->file_text.cursor > 0) {
-                if (Text_box_del(&editor->file_text, editor->file_text.cursor - 1) && !editor->unsaved_changes) {
-                    const char* unsaved_changes_text = "unsaved changes";
-                    String_cpy_from_cstr(&editor->save_info.string, unsaved_changes_text, strlen(unsaved_changes_text));
-                    editor->unsaved_changes = true;
-                }
+                Editor_del_main_file_text(editor);
             }
         } break;
         case KEY_ENTER: {
@@ -256,6 +255,7 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
         } break;
     } break;
     }
+
     case STATE_SEARCH: {
         int new_ch = wgetch(windows->main.window);
         switch (new_ch) {
@@ -342,6 +342,7 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
         } break;
         }
     } break;
+
     case STATE_COMMAND: {
         int new_ch = wgetch(windows->main.window);
         switch (new_ch) {
@@ -384,6 +385,7 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
         } break;
         }
     } break;
+
     case STATE_QUIT_CONFIRM: {
         int new_ch = wgetch(windows->main.window);
         switch (new_ch) {
@@ -396,6 +398,7 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
             String_cpy_from_cstr(&editor->general_info.string, insert_text, strlen(insert_text));
         } break;
     } break;
+
     }
 }
 
