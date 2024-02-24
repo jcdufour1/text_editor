@@ -17,6 +17,7 @@
 // TODO: make visual mode part of Text_box?
 // TODO: text wrap (things are broken when there is text wrap)
 // TODO: backward search does not actually check first letter of query
+// TODO: display info text when copying
 
 static const char* insert_text = "[insert]: press ctrl-I to enter command mode or exit";
 static const char* command_text = "[command]: press q to quit. press ctrl-I to go back to insert mode";
@@ -25,6 +26,20 @@ static const char* search_text = "[search]: press ctrl-f to go to insert mode; "
                                  "ctrl-h for help";
 static const char* search_failure_text = "[search]: no results. press ctrl-h for help";
 static const char* quit_confirm_text = "Are you sure that you want to exit without saving? N/y";
+
+typedef struct {
+    int height;
+    int width;
+    WINDOW* window;
+} Text_win;
+
+typedef struct {
+    int total_height;
+    int total_width;
+
+    Text_win main;
+    Text_win info;
+} Windows;
 
 static void draw_cursor(WINDOW* window, int64_t window_height, int64_t window_width, const Text_box* text_box, ED_STATE editor_state) {
     (void) editor_state;
@@ -64,31 +79,18 @@ static void draw_cursor(WINDOW* window, int64_t window_height, int64_t window_wi
 
 }
 
-typedef struct {
-    int total_height;
-    int total_width;
-
-    WINDOW* main_window;
-    int main_height;
-    int main_width;
-
-    WINDOW* info_window;
-    int info_height;
-    int info_width;
-} Windows;
-
 static void Windows_do_resize(Windows* windows) {
     getmaxyx(stdscr, windows->total_height, windows->total_width);
 
-    windows->main_height = windows->total_height - INFO_HEIGHT - 1;
-    windows->main_width = windows->total_width;
+    windows->main.height = windows->total_height - INFO_HEIGHT - 1;
+    windows->main.width = windows->total_width;
 
-    windows->info_height = INFO_HEIGHT;
-    windows->info_width = windows->total_width;
+    windows->main.height = INFO_HEIGHT;
+    windows->main.width = windows->total_width;
 
-    wresize(windows->main_window, windows->main_height, windows->main_width);
-    wresize(windows->info_window, windows->info_height, windows->info_width);
-    mvwin(windows->info_window, windows->main_height, 0);
+    wresize(windows->main.window, windows->main.height, windows->main.width);
+    wresize(windows->info.window, windows->info.height, windows->info.width);
+    mvwin(windows->info.window, windows->main.height, 0);
 }
 
 static void draw_main_window(WINDOW* window, int window_height, const Editor* editor) {
@@ -140,9 +142,9 @@ static void draw_main_window(WINDOW* window, int window_height, const Editor* ed
     //fprintf(stderr, "exiting draw_main_window()\n");
 }
 
-static void draw_info_window(WINDOW* info_window, const Editor* editor) {
+static void draw_info_window(WINDOW* info, const Editor* editor) {
     mvwprintw(
-        info_window,
+        info,
         0,
         0,
         "%.*s\n%.*s\n%.*s\n",
@@ -153,7 +155,7 @@ static void draw_info_window(WINDOW* info_window, const Editor* editor) {
         editor->save_info.string.count,
         editor->save_info.string.str
     );
-    mvwchgat(info_window, 1, editor->search_query.cursor, 1, A_REVERSE, 0, NULL);
+    mvwchgat(info, 1, editor->search_query.cursor, 1, A_REVERSE, 0, NULL);
 }
 
 static WINDOW* get_newwin(int height, int width, int starty, int startx) {
@@ -161,7 +163,7 @@ static WINDOW* get_newwin(int height, int width, int starty, int startx) {
     if (!new_window) {
         assert(false && "not implemented");
     }
-	keypad(new_window, TRUE);		/* We get F1, F2 etc..		*/
+	keypad(new_window, TRUE);		/* F1, F2 etc		*/
     box(new_window, 1, 1);
     wrefresh(new_window);
     return new_window;
@@ -172,8 +174,8 @@ static void Windows_free(Windows* windows) {
         return;
     }
 
-    delwin(windows->info_window);
-    delwin(windows->main_window);
+    delwin(windows->info.window);
+    delwin(windows->main.window);
 
     free(windows);
 }
@@ -200,7 +202,7 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
     *should_resize_window = false;
     switch (editor->state) {
     case STATE_INSERT: {
-        int new_ch = wgetch(windows->main_window);
+        int new_ch = wgetch(windows->main.window);
         switch (new_ch) {
         case KEY_RESIZE: {
             Windows_do_resize(windows);
@@ -255,7 +257,7 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
     } break;
     }
     case STATE_SEARCH: {
-        int new_ch = wgetch(windows->main_window);
+        int new_ch = wgetch(windows->main.window);
         switch (new_ch) {
         case KEY_RESIZE: {
             Windows_do_resize(windows);
@@ -341,7 +343,7 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
         }
     } break;
     case STATE_COMMAND: {
-        int new_ch = wgetch(windows->main_window);
+        int new_ch = wgetch(windows->main.window);
         switch (new_ch) {
         case KEY_RESIZE: {
             *should_resize_window = true;
@@ -383,7 +385,7 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
         }
     } break;
     case STATE_QUIT_CONFIRM: {
-        int new_ch = wgetch(windows->main_window);
+        int new_ch = wgetch(windows->main.window);
         switch (new_ch) {
         case 'y': //fallthrough
         case 'Y': {
@@ -440,7 +442,7 @@ void test_Text_box_scroll_if_nessessary(void) {
     memset(editor, 0, sizeof(*editor));
 
     // TODO: implement this test?
-    //Text_box_scroll_if_nessessary(&editor.file_text, windows->main_height, windows->main_width);
+    //Text_box_scroll_if_nessessary(&editor.file_text, windows->main.height, windows->main.width);
 
     free(editor);
 }
@@ -537,22 +539,22 @@ int main(int argc, char** argv) {
 
     getmaxyx(stdscr, windows->total_height, windows->total_width);
 
-    windows->main_height = windows->total_height - INFO_HEIGHT - 1;
-    windows->main_width = windows->total_width;
+    windows->main.height = windows->total_height - INFO_HEIGHT - 1;
+    windows->main.width = windows->total_width;
     assert(windows->total_height > INFO_HEIGHT);
-    windows->info_height = INFO_HEIGHT;
-    windows->info_width = windows->total_width;
-    windows->main_window = get_newwin(windows->main_height, windows->main_width, 0, 0);
-    if (!windows->main_window) {
+    windows->info.height = INFO_HEIGHT;
+    windows->info.width = windows->total_width;
+    windows->main.window = get_newwin(windows->main.height, windows->main.width, 0, 0);
+    if (!windows->main.window) {
         fprintf(stderr, "fetal error: could not initialize main window\n");
         exit(1);
     }
 
-    windows->info_window = get_newwin(windows->info_height, windows->info_width, windows->main_height, 0);
+    windows->info.window = get_newwin(windows->info.height, windows->info.width, windows->main.height, 0);
 
     String_cpy_from_cstr(&editor->general_info.string, insert_text, strlen(insert_text));
 
-    Text_box_scroll_if_nessessary(&editor->file_text, windows->main_height, windows->main_width);
+    Text_box_scroll_if_nessessary(&editor->file_text, windows->main.height, windows->main.width);
 
     bool should_close = false;
     bool should_resize_window = false;
@@ -562,21 +564,21 @@ int main(int argc, char** argv) {
         clear();    // erase();
         if (should_resize_window) {
             Windows_do_resize(windows);
-            assert(windows->main_width >= 1);
-            assert(windows->main_height >= 1);
+            assert(windows->main.width >= 1);
+            assert(windows->main.height >= 1);
         }
 
         // scroll if nessessary
-        Text_box_scroll_if_nessessary(&editor->file_text, windows->main_height, windows->main_width);
-        //wmove(windows->info_window, 0, 0);
+        Text_box_scroll_if_nessessary(&editor->file_text, windows->main.height, windows->main.width);
+        //wmove(windows->info, 0, 0);
         
-        draw_main_window(windows->main_window, windows->main_height, editor);
-        draw_info_window(windows->info_window, editor);
-        wrefresh(windows->main_window);
-        wrefresh(windows->info_window);
+        draw_main_window(windows->main.window, windows->main.height, editor);
+        draw_info_window(windows->info.window, editor);
+        wrefresh(windows->main.window);
+        wrefresh(windows->info.window);
 
         // position and draw cursor
-        draw_cursor(windows->main_window, windows->main_height, windows->main_width, &editor->file_text, editor->state);
+        draw_cursor(windows->main.window, windows->main.height, windows->main.width, &editor->file_text, editor->state);
 
         // get and process next keystroke
         process_next_input(&should_resize_window, windows, editor, &should_close);
