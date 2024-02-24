@@ -6,7 +6,7 @@
 
 typedef enum {SEARCH_FIRST, SEARCH_REPEAT} SEARCH_STATUS;
 
-typedef enum {GEN_INFO_NORMAL, GEN_INFO_OLDEST_CHANGE} GEN_INFO_STATE;
+typedef enum {GEN_INFO_NORMAL, GEN_INFO_OLDEST_CHANGE, GEN_INFO_NEWEST_CHANGE} GEN_INFO_STATE;
 
 typedef struct {
     bool unsaved_changes;
@@ -24,6 +24,7 @@ typedef struct {
     String clipboard;
 
     Actions actions;
+    Actions undo_actions;
 } Editor;
 
 static Editor* Editor_get() {
@@ -43,12 +44,37 @@ static void Editor_undo(Editor* editor) {
     Actions_pop(&action_to_undo, &editor->actions);
 
     switch (action_to_undo.action) {
-    case ACTION_INSERT_CH:
+    case ACTION_INSERT_CH: {
         Text_box_del(&editor->file_text, action_to_undo.cursor);
-        break;
-    case ACTION_BACKSPACE_CH:
+        Action undo_action = {.cursor = action_to_undo.cursor, .action = ACTION_BACKSPACE_CH, .ch = action_to_undo.ch};
+        Actions_append(&editor->undo_actions, &undo_action);
+        } break;
+    case ACTION_BACKSPACE_CH: {
         Text_box_insert(&editor->file_text, action_to_undo.ch, action_to_undo.cursor);
-        break;
+        Action undo_action = {.cursor = action_to_undo.cursor, .action = ACTION_INSERT_CH, .ch = action_to_undo.ch};
+        Actions_append(&editor->undo_actions, &undo_action);
+        } break;
+    default:
+        assert(false && "unreachable");
+        abort();
+    }
+}
+
+static void Editor_redo(Editor* editor) {
+    Action action_to_redo;
+    Actions_pop(&action_to_redo, &editor->undo_actions);
+
+    switch (action_to_redo.action) {
+    case ACTION_INSERT_CH: {
+        Text_box_del(&editor->file_text, action_to_redo.cursor);
+        Action redo_action = {.cursor = action_to_redo.cursor, .action = ACTION_BACKSPACE_CH, .ch = action_to_redo.ch};
+        Actions_append(&editor->actions, &redo_action);
+        } break;
+    case ACTION_BACKSPACE_CH: {
+        Text_box_insert(&editor->file_text, action_to_redo.ch, action_to_redo.cursor);
+        Action redo_action = {.cursor = action_to_redo.cursor, .action = ACTION_INSERT_CH, .ch = action_to_redo.ch};
+        Actions_append(&editor->actions, &redo_action);
+        } break;
     default:
         assert(false && "unreachable");
         abort();
@@ -120,7 +146,8 @@ static void Editor_insert_into_main_file_text(Editor* editor, int new_ch, size_t
     switch (editor->gen_info_state) {
     case GEN_INFO_NORMAL:
         break;
-    case GEN_INFO_OLDEST_CHANGE:
+    case GEN_INFO_OLDEST_CHANGE: // fallthrough
+    case GEN_INFO_NEWEST_CHANGE:
         String_cpy_from_cstr(&editor->general_info.string, command_text, strlen(command_text));
         editor->gen_info_state = GEN_INFO_NORMAL;
         break;
@@ -143,7 +170,8 @@ static void Editor_del_main_file_text(Editor* editor) {
     switch (editor->gen_info_state) {
     case GEN_INFO_NORMAL:
         break;
-    case GEN_INFO_OLDEST_CHANGE:
+    case GEN_INFO_OLDEST_CHANGE: // fallthrough
+    case GEN_INFO_NEWEST_CHANGE:
         String_cpy_from_cstr(&editor->general_info.string, command_text, strlen(command_text));
         editor->gen_info_state = GEN_INFO_NORMAL;
         break;

@@ -216,6 +216,15 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
             }
             Editor_undo(editor);
         } break;
+        case ctrl('y'): {
+            if (editor->undo_actions.count < 1) {
+                const char* redo_failure_text = "already at newest change";
+                String_cpy_from_cstr(&editor->general_info.string, redo_failure_text, strlen(redo_failure_text));
+                editor->gen_info_state = GEN_INFO_NEWEST_CHANGE;
+                break;
+            }
+            Editor_redo(editor);
+        } break;
         case KEY_LEFT: {
             Text_box_move_cursor(&editor->file_text, DIR_LEFT);
         } break;
