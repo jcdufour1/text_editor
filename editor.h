@@ -15,6 +15,8 @@ typedef struct {
     Text_box general_info;
     ED_STATE state;
     SEARCH_STATUS search_status;
+
+    String clipboard;
 } Editor;
 
 static Editor* Editor_get() {
@@ -31,6 +33,7 @@ static void Editor_free(Editor* editor) {
 
 static bool Editor_save_file(const Editor* editor) {
     // TODO: confirm that temp_file_name does not already exist
+    // TODO: make actual name for temp file
     const char* temp_file_name = ".temp_thingyksdjfaijdfkj.txt";
 
     // write temporary file

@@ -158,12 +158,6 @@ static void Text_box_move_cursor(Text_box* text_box, DIRECTION direction) {
     switch (text_box->visual.state) {
     case VIS_STATE_START: // fallthrough
     case VIS_STATE_END:
-        fprintf(
-            stderr,
-            "text_box->cursor: %zu    text_box->visual.start: %zu\n", 
-            text_box->cursor,
-            text_box->visual.start
-        );
         if (text_box->cursor < text_box->visual.start) {
             text_box->visual.state = VIS_STATE_START;
         } else if (text_box->cursor > text_box->visual.end) {
@@ -255,7 +249,16 @@ static bool Text_box_do_search(Text_box* text_box_to_search, const String* query
     return false;
 }
 
-static void Text_box_get_index_scroll_offset(size_t* index, const Text_box* text_box, bool do_log) {
+typedef struct {
+    size_t curr_y;
+    size_t index;
+} Cached_data;
+
+static void Text_box_get_index_scroll_offset(Cached_data* new_cached_data, size_t* index, const Text_box* text_box, bool do_log) {
+    Cached_data cached_data = {.curr_y = 0};
+    if (new_cached_data) {
+        cached_data = *new_cached_data;
+    }
     // index will be set to the index of the beginning of the line at text_box->scroll_x
     if (do_log) {
         fprintf(stderr, "        starting Text_box_get_index_scroll_offset() text_box->scroll_y: %zu\n", text_box->scroll_y);
@@ -264,7 +267,7 @@ static void Text_box_get_index_scroll_offset(size_t* index, const Text_box* text
         assert(false && "not implemented");
     }
 
-    *index = 0;
+    *index = cached_data.index;
     //char* curr_line = safe_malloc(10000);
     if (text_box->string.count < 1) {
         return;
@@ -272,7 +275,9 @@ static void Text_box_get_index_scroll_offset(size_t* index, const Text_box* text
     if (do_log) {
         fprintf(stderr, "        in Text_box_get_index_scroll_offset: index: %zu    char: '%c'\n", *index, text_box->string.str[*index]);
     }
-    for (size_t curr_y = 0; curr_y < text_box->scroll_y; curr_y++) {
+    size_t curr_y;
+    for (curr_y = cached_data.curr_y; curr_y < text_box->scroll_y; curr_y++) {
+        assert(curr_y < 1000000000);
         //String_get_curr_line(curr_line, &text_box->str, *index);
         //assert(strlen(curr_line) > 1);
         if (!get_index_start_next_line(index, text_box, *index)) {
@@ -286,6 +291,11 @@ static void Text_box_get_index_scroll_offset(size_t* index, const Text_box* text
     if (do_log) {
         fprintf(stderr, "        end Text_box_get_index_scroll_offset() text_box->scroll_y: %zu    result: %zu\n", text_box->scroll_y, *index);
     }
+    if (new_cached_data) {
+        new_cached_data->curr_y = curr_y;
+        new_cached_data->index = *index;
+    }
+
 }
 
 #define GETLINE_BUF_SIZE 10000
@@ -301,19 +311,19 @@ void getline_thing(char* buf, const char* str) {
     }
 }
 
-static void Text_box_get_screen_xy_at_cursor_pos(int64_t* screen_x, int64_t* screen_y, const Text_box* text_box, size_t cursor_absolute) {
+static void Text_box_get_screen_xy_at_cursor_pos(Cached_data* cached_data, int64_t* screen_x, int64_t* screen_y, const Text_box* text_box, size_t cursor_absolute) {
     //fprintf(stderr, "    entering Editor_get_xy_at_cursor: Editor_get_index_scroll_offset()\n");
     if (text_box->scroll_x > 0) {
         assert(false && "not implemented");
     }
 
     size_t scroll_offset;
-    Text_box_get_index_scroll_offset(&scroll_offset, text_box, false);
+    Text_box_get_index_scroll_offset(cached_data, &scroll_offset, text_box, false);
     //fprintf(stderr, "    in Editor_get_xy_at_cursor: Editor_get_index_scroll_offset() result: %zu\n", scroll_offset);
     *screen_x = 0;
     *screen_y = 0;
     if (scroll_offset > cursor_absolute) {
-        Text_box_get_index_scroll_offset(&scroll_offset, text_box, false);
+        Text_box_get_index_scroll_offset(cached_data, &scroll_offset, text_box, false);
         int64_t idx;
         for (idx = scroll_offset - 1; idx >= (int64_t)cursor_absolute; idx--) {
             if (text_box->string.str[idx] == '\r') {
@@ -357,15 +367,15 @@ static void Text_box_get_screen_xy_at_cursor_pos(int64_t* screen_x, int64_t* scr
     //fprintf(stderr, "    exiting Editor_get_xy_at_cursor: Editor_get_index_scroll_offset()\n");
 }
 
-static void Text_box_get_screen_xy(int64_t* screen_x, int64_t* screen_y, const Text_box* text_box) {
-    Text_box_get_screen_xy_at_cursor_pos(screen_x, screen_y, text_box, text_box->cursor);
+static void Text_box_get_screen_xy(Cached_data* cached_data, int64_t* screen_x, int64_t* screen_y, const Text_box* text_box) {
+    Text_box_get_screen_xy_at_cursor_pos(cached_data, screen_x, screen_y, text_box, text_box->cursor);
 }
 
 static void Text_box_scroll_if_nessessary(Text_box* text_box, int64_t main_window_height, int64_t main_window_width) {
     //fprintf(stderr, "entering Text_box_scroll_if_nessessary(): main_window_height: %zu\n", main_window_height);
     int64_t screen_x;
     int64_t screen_y;
-    Text_box_get_screen_xy(&screen_x, &screen_y, text_box);
+    Text_box_get_screen_xy(NULL, &screen_x, &screen_y, text_box);
 
     if (screen_y >= main_window_height) {
         text_box->scroll_y += screen_y - main_window_height + 1;

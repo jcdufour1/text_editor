@@ -15,10 +15,14 @@
 // TODO: add undo/redo
 // TODO: speed up scrolling/searching
 // TODO: make visual mode part of Text_box?
+// TODO: text wrap (things are broken when there is text wrap)
+// TODO: backward search does not actually check first letter of query
 
 static const char* insert_text = "[insert]: press ctrl-I to enter command mode or exit";
 static const char* command_text = "[command]: press q to quit. press ctrl-I to go back to insert mode";
-static const char* search_text = "[search]: press ctrl-f to go to insert mode; ctrl-n or ctrl-p to go to next/previous result, ctrl-h for help";
+static const char* search_text = "[search]: press ctrl-f to go to insert mode; "
+                                 "ctrl-n or ctrl-p to go to next/previous result; " 
+                                 "ctrl-h for help";
 static const char* search_failure_text = "[search]: no results. press ctrl-h for help";
 static const char* quit_confirm_text = "Are you sure that you want to exit without saving? N/y";
 
@@ -51,7 +55,7 @@ static void draw_cursor(WINDOW* window, int64_t window_height, int64_t window_wi
 
     int64_t screen_x;
     int64_t screen_y;
-    Text_box_get_screen_xy(&screen_x, &screen_y, text_box);
+    Text_box_get_screen_xy(NULL, &screen_x, &screen_y, text_box);
     assert(window_width >= 1);
     assert(window_height >= 1);
     assert(screen_x < window_width);
@@ -87,45 +91,45 @@ static void Windows_do_resize(Windows* windows) {
     mvwin(windows->info_window, windows->main_height, 0);
 }
 
-static void draw_main_window(WINDOW* window, const Editor* editor) {
+static void draw_main_window(WINDOW* window, int window_height, const Editor* editor) {
     //fprintf(stderr, "entering draw_main_window()\n");
     if (editor->file_text.scroll_x > 0) {
         assert(false && "not implemented");
     }
 
     size_t index;
-    Text_box_get_index_scroll_offset(&index, &editor->file_text, false);
+    Text_box_get_index_scroll_offset(NULL, &index, &editor->file_text, false);
 
     if (editor->file_text.string.count > 0) {
         mvwprintw(window, 0, 0, "%.*s\n", editor->file_text.string.count, editor->file_text.string.str + index);
     }
 
     int64_t visual_x, visual_y;
-    Text_box_get_screen_xy_at_cursor_pos(&visual_x, &visual_y, &editor->file_text, editor->file_text.visual.start);
     switch (editor->file_text.visual.state) {
     case VIS_STATE_NONE:
-        fprintf(stderr, "draw_main_window: no\n");
         break;
     case VIS_STATE_START: // fallthrough
     case VIS_STATE_END:
-        fprintf(
-            stderr,
-            "editor->file_text.visual.start: %zu      editor->file_text.visual.end: %zu\n",
-            editor->file_text.visual.start,
-            editor->file_text.visual.end
-        );
         assert(editor->file_text.visual.end >= editor->file_text.visual.start);
+        Cached_data cached_data = {.curr_y = 0};
         for (int64_t idx_visual = editor->file_text.visual.start; idx_visual <= (int64_t)editor->file_text.visual.end; idx_visual++) {
-            Text_box_get_screen_xy_at_cursor_pos(&visual_x, &visual_y, &editor->file_text, idx_visual);
-            mvwchgat(
-                window,
-                visual_y,
-                visual_x,
-                1,
-                A_REVERSE,
-                0,
-                NULL
-            );
+            Text_box_get_screen_xy_at_cursor_pos(&cached_data, &visual_x, &visual_y, &editor->file_text, idx_visual);
+            //fprintf(stderr, "thing123  visual_x: %zi    visual_y: %zi\n", visual_x, visual_y);
+
+            if (visual_y < 0) {
+            } else if (visual_y > window_height) {
+                break;
+            } else {
+                mvwchgat(
+                    window,
+                    visual_y,
+                    visual_x,
+                    1,
+                    A_REVERSE,
+                    0,
+                    NULL
+                );
+            }
         }
         break;
     default:
@@ -178,6 +182,20 @@ static void Windows_init(Windows* windows) {
     memset(windows, 0, sizeof(*windows));
 }
 
+static void Editor_cpy_selection(Editor* editor) {
+    String_cpy_from_substring(
+        &editor->clipboard,
+        &editor->file_text.string,
+        editor->file_text.visual.start,
+        editor->file_text.visual.end + 1 - editor->file_text.visual.start
+    );
+}
+
+static void Editor_paste_selection(Editor* editor) {
+    fprintf(stderr, "Editor_paste_selection: clipboard: \"%.*s\"\n", (int)editor->clipboard.count, editor->clipboard.str);
+    String_insert_string(&editor->file_text.string, editor->file_text.cursor, &editor->clipboard);
+}
+
 static void process_next_input(bool* should_resize_window, Windows* windows, Editor* editor, bool* should_close) {
     *should_resize_window = false;
     switch (editor->state) {
@@ -200,6 +218,12 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
         } break;
         case ctrl('s'): {
             Editor_save(editor);
+        } break;
+        case ctrl('c'): {
+            Editor_cpy_selection(editor);
+        } break;
+        case ctrl('v'): {
+            Editor_paste_selection(editor);
         } break;
         case KEY_LEFT: {
             Text_box_move_cursor(&editor->file_text, DIR_LEFT);
@@ -428,7 +452,7 @@ void test_template_Text_box_get_index_scroll_offset(const char* text, size_t scr
     String_cpy_from_cstr(&text_box->string, text, sizeof(text));
     text_box->scroll_y = scroll_y;
     size_t index;
-    Text_box_get_index_scroll_offset(&index, text_box, false);
+    Text_box_get_index_scroll_offset(NULL, &index, text_box, false);
     assert(expected_offset == index && "test failed");
     free(text_box);
 }
@@ -538,13 +562,15 @@ int main(int argc, char** argv) {
         clear();    // erase();
         if (should_resize_window) {
             Windows_do_resize(windows);
+            assert(windows->main_width >= 1);
+            assert(windows->main_height >= 1);
         }
 
         // scroll if nessessary
         Text_box_scroll_if_nessessary(&editor->file_text, windows->main_height, windows->main_width);
         //wmove(windows->info_window, 0, 0);
         
-        draw_main_window(windows->main_window, editor);
+        draw_main_window(windows->main_window, windows->main_height, editor);
         draw_info_window(windows->info_window, editor);
         wrefresh(windows->main_window);
         wrefresh(windows->info_window);

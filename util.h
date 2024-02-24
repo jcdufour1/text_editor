@@ -65,6 +65,33 @@ static void String_insert(String* string, char new_ch, size_t index) {
     string->count++;
 }
 
+static void String_insert_substring(String* dest, size_t index, const String* src, size_t src_start, size_t count) {
+    assert(index <= dest->count);
+    memset(dest + index, 0, sizeof(dest->str[0]) * count);
+    if (dest->capacity < dest->count + 1) {
+        if (dest->capacity == 0) {
+            dest->capacity = TEXT_DEFAULT_CAP;
+            dest->str = safe_malloc(dest->capacity * sizeof(char));
+            memset(dest->str, 0, dest->capacity);
+        } 
+        size_t text_prev_capacity = dest->capacity;
+        while (dest->capacity < dest->count + 1) {
+            dest->capacity = dest->capacity * 2;
+        }
+        dest->str = safe_realloc(dest->str, dest->capacity * sizeof(char));
+        memset(dest->str + text_prev_capacity, 0, dest->capacity - text_prev_capacity);
+    }
+    assert(dest->capacity >= dest->count + count);
+
+    memmove(dest->str + index + count, dest->str + index, dest->count - index);
+    memmove(dest->str + index, src->str + src_start, count);
+    dest->count += count;
+}
+
+static void String_insert_string(String* dest, size_t index, const String* src) {
+    String_insert_substring(dest, index, src, 0, src->count);
+}
+
 static void String_cpy_from_cstr(String* dest, const char* src, size_t src_size) {
     memset(dest, 0, sizeof(*dest));
     if (dest->capacity < dest->count + 1) {
@@ -84,6 +111,27 @@ static void String_cpy_from_cstr(String* dest, const char* src, size_t src_size)
 
     memmove(dest->str, src, src_size);
     dest->count = src_size;
+}
+
+static void String_cpy_from_substring(String* dest, const String* src, size_t src_start, size_t count) {
+    memset(dest, 0, sizeof(*dest));
+    if (dest->capacity < count + 1) {
+        if (dest->capacity == 0) {
+            dest->capacity = TEXT_DEFAULT_CAP;
+            dest->str = safe_malloc(dest->capacity * sizeof(char));
+            memset(dest->str, 0, dest->capacity);
+        } 
+        size_t text_prev_capacity = dest->capacity;
+        while (dest->capacity < dest->count + 1) {
+            dest->capacity = dest->capacity * 2;
+        }
+        dest->str = safe_realloc(dest->str, dest->capacity * sizeof(char));
+        memset(dest->str + text_prev_capacity, 0, dest->capacity - text_prev_capacity);
+    }
+    assert(dest->capacity >= dest->count + count);
+
+    memmove(dest->str, src->str + src_start, count);
+    dest->count = count;
 }
 
 static void String_append(String* string, int new_ch) {
