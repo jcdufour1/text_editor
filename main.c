@@ -13,10 +13,9 @@
 #include "text_box.h"
 
 // TODO: speed up scrolling/searching
-// TODO: make visual mode part of Text_box?
 // TODO: text wrap (things are broken when there is text wrap)
-// TODO: backward search does not actually check first letter of query
 // TODO: set info text to say "copying", etc. when copying
+// TODO: make way to pipe text into grep and jump to result, similar to :grep in vim
 
 typedef struct {
     int height;
