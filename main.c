@@ -488,7 +488,7 @@ void test_template_get_index_start_next_line(const char* test_string, size_t ind
     Text_box text_box = {0};
     String_cpy_from_cstr(&test_text, test_string, strlen(test_string));
     text_box.string = test_text;
-    if (!get_start_next_visual_line(&result, &text_box, index_before, 0, 1000000)) {
+    if (!get_start_next_visual_line_from_curr_cursor_x(&result, &text_box, index_before, 0, 1000000)) {
         assert(false);
     }
     debug("test_string: %s; index_before: %zu; result: %zu; expected_result: %zu", test_string, index_before, result, expected_result);
