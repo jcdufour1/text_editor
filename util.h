@@ -10,8 +10,6 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "vector.h"
-
 static const char* insert_text = "[insert]: press ctrl-I to enter command mode or exit";
 static const char* command_text = "[command]: press q to quit. press ctrl-I to go back to insert mode";
 static const char* search_text = "[search]: press ctrl-f to go to insert mode; "
@@ -23,6 +21,14 @@ static const char* quit_confirm_text = "Are you sure that you want to exit witho
 #define INFO_HEIGHT 4
 
 #define ctrl(x)           ((x) & 0x1f)
+
+#define todo(...) do {assert(false && "not implemented:" && __VA_ARGS__);} while(0)
+
+#define debug(...) do { \
+        fprintf(stderr, "file:%s:%d:", __FILE__, __LINE__); \
+        fprintf(stderr, __VA_ARGS__); \
+        fprintf(stderr, "\n"); \
+    } while(0)
 
 typedef enum {SEARCH_DIR_FORWARDS, SEARCH_DIR_BACKWARDS} SEARCH_DIR;
 
