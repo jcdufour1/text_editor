@@ -33,111 +33,6 @@ static inline int Text_box_at(const Text_box* text, size_t cursor) {
     return text->string.str[cursor];
 }
 
-static inline bool get_index_start_next_actual_line(size_t* result, const Text_box* text, size_t curr_cursor) {
-    //fprintf(stderr, "get_index_start_next_line before: curr_cursor: %zu\n", curr_cursor);
-    assert(curr_cursor <= text->string.count);
-    if (curr_cursor >= text->string.count) {
-        return false;
-    }
-
-    bool found_next_line = false;
-
-    while (curr_cursor++ < text->string.count) {
-        //fprintf(stderr, "get_index_start_next_line during: curr_cursor: %zu\n", curr_cursor);
-        if (text->string.str[curr_cursor - 1] == '\n') {
-            found_next_line = true;
-            break;
-        }
-    }
-
-    *result = curr_cursor;
-    return found_next_line;
-}
-
-static inline size_t get_index_start_curr_visual_line(const Text_box* text, size_t visual_x, size_t curr_cursor) {
-    size_t curr_visual_x = visual_x;
-    while(curr_cursor > 0) {
-        if (curr_visual_x < 1 || text->string.str[curr_cursor - 1] == '\n') {
-            break;
-        }
-        curr_cursor--;
-        curr_visual_x--;
-    }
-    return curr_cursor;
-}
-
-static inline bool get_index_start_prev_visual_line(size_t* result, const Text_box* text, size_t visual_x, size_t curr_cursor) {
-    // TODO: this function does not function properly
-    assert(false && "not implemented");
-    curr_cursor = get_index_start_curr_visual_line(text, visual_x, curr_cursor);
-    if (curr_cursor < 1) {
-        *result = get_index_start_curr_visual_line(text, visual_x, curr_cursor);
-        return false;
-        //assert(false && "not implemented");
-    }
-
-    size_t end_prev_line = curr_cursor - 1;
-
-    if (text->string.str[end_prev_line] == '\r') {
-        assert(false && "not implemented");
-        //end_prev_line--;
-    }
-
-    // end_prev_line is equal to the index of newline at end of prev line
-    *result = get_index_start_curr_visual_line(text, visual_x, end_prev_line);
-    return true;
-}
-
-static inline size_t get_index_start_curr_actual_line(const Text_box* text, size_t curr_cursor) {
-    while(curr_cursor > 0) {
-        if (text->string.str[curr_cursor - 1] == '\n') {
-            break;
-        }
-        curr_cursor--;
-    }
-    return curr_cursor;
-}
-
-static inline bool get_index_start_prev_actual_line(size_t* result, const Text_box* text, size_t curr_cursor) {
-    // TODO: this function does not function properly
-    curr_cursor = get_index_start_curr_actual_line(text, curr_cursor);
-    if (curr_cursor < 1) {
-        *result = get_index_start_curr_actual_line(text, curr_cursor);
-        return false;
-        //assert(false && "not implemented");
-    }
-
-    size_t end_prev_line = curr_cursor - 1;
-    fprintf(stderr, "get_index_start_prev_actual_line: end_prev_line: %zi\n", end_prev_line);
-
-    if (text->string.str[end_prev_line] == '\r') {
-        assert(false && "not implemented");
-        //end_prev_line--;
-    }
-
-    // end_prev_line is equal to the index of newline at end of prev line
-    *result = get_index_start_curr_actual_line(text, end_prev_line);
-    return true;
-}
-
-static inline size_t len_curr_actual_line(const Text_box* text, size_t curr_cursor) {
-    size_t idx_next_line;
-    if (!get_index_start_next_actual_line(&idx_next_line, text, curr_cursor)) {
-        assert(false);
-    }
-    return idx_next_line - get_index_start_curr_actual_line(text, curr_cursor);
-    /*
-    size_t initial_cursor = curr_cursor;
-    for (; curr_cursor < text->string.count && text->string.str[curr_cursor] != '\n'; curr_cursor++) {
-        if (curr_cursor + 1 >= text->string.count) {
-            // at end of file
-            return text->string.count - initial_cursor;
-        }
-    }
-    return curr_cursor - initial_cursor;
-    */
-}
-
 static inline bool get_start_next_generic_line_from_curr_cursor_x_pos(size_t* result, const Text_box* text, size_t cursor, size_t curr_visual_x, size_t max_visual_width, bool is_visual) {
     size_t curr_cursor = cursor;
 
@@ -469,8 +364,6 @@ static inline void Text_box_append(Text_box* text, int new_ch, size_t max_visual
     Text_box_insert(text, new_ch, text->string.count, max_visual_width, do_log);
 }
 
-//static bool String_substrin
-
 static inline bool Text_box_do_search(Text_box* text_box_to_search, const String* query, SEARCH_DIR search_direction) {
     // search result put in text_box_to_search->cursor
     if (query->count < 1) {
@@ -532,11 +425,6 @@ static inline bool Text_box_do_search(Text_box* text_box_to_search, const String
 
     return false;
 }
-
-typedef struct {
-    size_t curr_y;
-    size_t index;
-} Cached_data;
 
 static inline void Text_box_get_index_scroll_offset(
     size_t* result,
