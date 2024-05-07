@@ -33,7 +33,14 @@ static inline int Text_box_at(const Text_box* text, size_t cursor) {
     return text->string.str[cursor];
 }
 
-static inline bool get_start_next_generic_line_from_curr_cursor_x_pos(size_t* result, const Text_box* text, size_t cursor, size_t curr_visual_x, size_t max_visual_width, bool is_visual) {
+static inline bool get_start_next_generic_line_from_curr_cursor_x_pos(
+    size_t* result,
+    const Text_box* text,
+    size_t cursor,
+    size_t curr_visual_x,
+    size_t max_visual_width,
+    bool is_visual
+) {
     size_t curr_cursor = cursor;
 
     if (curr_cursor >= text->string.count) {
@@ -93,8 +100,108 @@ static inline bool get_start_next_generic_line_from_curr_cursor_x_pos(size_t* re
     return true;
 }
 
-static inline bool get_start_next_visual_line_from_curr_cursor_x(size_t* result, const Text_box* text, size_t curr_cursor, size_t curr_visual_x, size_t max_visual_width) {
-    return get_start_next_generic_line_from_curr_cursor_x_pos(result, text, curr_cursor, curr_visual_x, max_visual_width, true);
+static inline bool get_start_prev_generic_line_from_curr_cursor_x_pos(
+    size_t* result,
+    const Text_box* text,
+    size_t cursor,
+    size_t curr_visual_x,
+    size_t max_visual_width,
+    bool is_visual
+) {
+    size_t curr_cursor = cursor;
+
+    if (curr_cursor >= text->string.count) {
+        // no more lines are remaining
+        return false;
+    }
+
+    // find next newline
+    while (1) {
+        if (curr_cursor < 1) {
+            // no more lines are remaining
+            return false;
+        }
+
+        if (text->string.str[curr_cursor] == '\r') {
+            if (curr_cursor < 1 || Text_box_at(text, curr_cursor - 1) != '\n') {
+                assert(false && "\\r line ending not implemented; only \\n and \\n\\r are implemented");
+            }
+            break;
+        }
+
+        if (is_visual && curr_visual_x >= max_visual_width) {
+            assert(curr_visual_x == max_visual_width);
+            if (curr_cursor >= text->string.count) {
+                // no more lines are remaining
+                return false;
+            }
+            *result = curr_cursor;
+            return true;
+        }
+
+        if (text->string.str[curr_cursor] == '\n') {
+            // found end curr line (or one before if \n\r is used)
+            break;
+        }
+
+        curr_visual_x++;
+        curr_cursor++;
+    }
+
+    if (curr_cursor >= text->string.count) {
+        // no more lines are remaining
+        return false;
+    }
+
+    // advance one more to get to beginning of next line (or to \r at end of current line)
+    curr_cursor++;
+
+    // advance cursor one more if \n\r is used instead of \n
+    if (text->string.str[curr_cursor] == '\r') {
+        curr_cursor++;
+    }
+
+    if (curr_cursor > text->string.count) {
+        // no more lines are remaining
+        return false;
+    }
+
+    *result = curr_cursor;
+    return true;
+}
+
+static inline bool get_start_next_visual_line_from_curr_cursor_x(
+    size_t* result,
+    const Text_box* text,
+    size_t curr_cursor,
+    size_t curr_visual_x,
+    size_t max_visual_width
+) {
+    return get_start_next_generic_line_from_curr_cursor_x_pos(
+        result,
+        text,
+        curr_cursor,
+        curr_visual_x,
+        max_visual_width,
+        true
+    );
+}
+
+static inline bool get_start_prev_visual_line_from_curr_cursor_x(
+    size_t* result,
+    const Text_box* text,
+    size_t curr_cursor,
+    size_t curr_visual_x,
+    size_t max_visual_width
+) {
+    return get_start_prev_generic_line_from_curr_cursor_x_pos(
+        result,
+        text,
+        curr_cursor,
+        curr_visual_x,
+        max_visual_width,
+        true
+    );
 }
 
 typedef struct {
@@ -161,7 +268,7 @@ static inline void get_start_generic_line_internal(
 }
 
 static inline size_t get_absol_start_visual_line(const Text_box* text, size_t cursor, size_t max_visual_width) {
-    Line_start_data line_data = {0};
+    Line_start_data line_data;
     get_start_generic_line_internal(&line_data, text, cursor, max_visual_width, false, true);
     return line_data.absolute_cursor;
 }
@@ -171,7 +278,7 @@ static inline size_t get_visual_x_at_cursor(const Text_box* text, size_t cursor,
 }
 
 static inline size_t get_visual_y_at_cursor(const Text_box* text, size_t cursor, size_t max_visual_width) {
-    Line_start_data line_data = {0};
+    Line_start_data line_data;
     get_start_generic_line_internal(&line_data, text, cursor, max_visual_width, false, true);
     return line_data.y;
 }
@@ -223,14 +330,8 @@ static inline void Text_box_recalculate_visual_xy(Text_box* text_box, size_t max
     text_box->visual_y = get_visual_y_at_cursor(text_box, text_box->cursor, max_visual_width);
 }
 
-static inline void Text_box_move_cursor(Text_box* text_box, DIRECTION direction, size_t max_visual_width, bool do_log) {
-    size_t curr_visual_x = get_visual_x_at_cursor(text_box, text_box->cursor, max_visual_width);
-    size_t curr_visual_y = get_visual_y_at_cursor(text_box, text_box->cursor, max_visual_width);
-
-    (void) max_visual_width;
-    (void) do_log;
-    (void) curr_visual_x;
-    (void) curr_visual_y;
+static inline void Text_box_move_cursor(Text_box* text_box, DIRECTION direction, size_t max_visual_width) {
+    //size_t curr_visual_x = get_visual_x_at_cursor(text_box, text_box->cursor, max_visual_width);
 
     switch (direction) {
         case DIR_LEFT:
@@ -263,7 +364,7 @@ static inline void Text_box_move_cursor(Text_box* text_box, DIRECTION direction,
                 }
                 text_box->visual_x = 0;
                 text_box->visual_y++;
-                debug("tjje");
+                //debug("tjje");
             } else {
                 text_box->visual_x += 1;
             }
@@ -273,7 +374,7 @@ static inline void Text_box_move_cursor(Text_box* text_box, DIRECTION direction,
             if (text_box->visual_x >= max_visual_width) {
                 text_box->visual_x = 0;
                 text_box->visual_y++;
-                debug("tjje");
+                //debug("tjje");
             }
 
             text_box->user_max_col = text_box->visual_x;
@@ -312,7 +413,7 @@ static inline void Text_box_move_cursor(Text_box* text_box, DIRECTION direction,
 
             size_t start_next_line;
             if (!get_start_next_visual_line_from_curr_cursor_x(
-                &start_next_line, text_box, text_box->cursor, curr_visual_x, max_visual_width
+                &start_next_line, text_box, text_box->cursor, text_box->visual_x, max_visual_width
             )) {
                 debug("thign");
                 break;
@@ -321,10 +422,11 @@ static inline void Text_box_move_cursor(Text_box* text_box, DIRECTION direction,
             text_box->visual_y++;
 
             size_t start_curr_line = get_absol_start_visual_line(text_box, text_box->cursor, max_visual_width);
+            (void) start_curr_line;
 
             size_t start_2next_line;
             if (!get_start_next_visual_line_from_curr_cursor_x(
-                &start_2next_line, text_box, start_next_line, curr_visual_x, max_visual_width
+                &start_2next_line, text_box, start_next_line, text_box->visual_x, max_visual_width
             )) {
                 start_2next_line = text_box->string.count + 1;
             }
@@ -343,25 +445,25 @@ static inline void Text_box_move_cursor(Text_box* text_box, DIRECTION direction,
     }
 }
 
-static inline bool Text_box_del(Text_box* text_box, size_t index, size_t max_visual_width, bool do_log) {
+static inline bool Text_box_del(Text_box* text_box, size_t index, size_t max_visual_width) {
     if (text_box->string.count < 1) {
         return false;
     }
 
     assert(text_box->cursor > 0);
-    Text_box_move_cursor(text_box, DIR_LEFT, max_visual_width, do_log);
+    Text_box_move_cursor(text_box, DIR_LEFT, max_visual_width);
 
     return String_del(&text_box->string, index);
 }
 
-static inline void Text_box_insert(Text_box* text_box, int new_ch, size_t index, size_t max_visual_width, bool do_log) {
+static inline void Text_box_insert(Text_box* text_box, int new_ch, size_t index, size_t max_visual_width) {
     assert(index <= text_box->string.count && "out of bounds");
     String_insert(&text_box->string, new_ch, index);
-    Text_box_move_cursor(text_box, DIR_RIGHT, max_visual_width, do_log);
+    Text_box_move_cursor(text_box, DIR_RIGHT, max_visual_width);
 }
 
-static inline void Text_box_append(Text_box* text, int new_ch, size_t max_visual_width, bool do_log) {
-    Text_box_insert(text, new_ch, text->string.count, max_visual_width, do_log);
+static inline void Text_box_append(Text_box* text, int new_ch, size_t max_visual_width) {
+    Text_box_insert(text, new_ch, text->string.count, max_visual_width);
 }
 
 static inline bool Text_box_do_search(Text_box* text_box_to_search, const String* query, SEARCH_DIR search_direction) {
@@ -444,20 +546,6 @@ static inline void Text_box_get_index_scroll_offset(
     *result = curr_cursor;
 }
 
-
-#define GETLINE_BUF_SIZE 10000
-
-//static char getline_buf[GETLINE_BUF_SIZE];
-
-void getline_thing(char* buf, const char* str) {
-    // buf will not include newline char
-    memset(buf, 0, GETLINE_BUF_SIZE);
-
-    for (size_t idx = 0; str[idx] && str[idx] != '\n'; idx++) {
-        buf[idx] = str[idx];
-    }
-}
-
 static inline void Text_box_get_screen_xy_at_cursor_pos(
         int64_t* screen_x,
         int64_t* screen_y,
@@ -524,8 +612,6 @@ static inline void Text_box_get_screen_xy_at_cursor_pos(
             }
         }
     }
-
-    //fprintf(stderr, "    exiting Editor_get_xy_at_cursor: Editor_get_index_scroll_offset()\n");
 }
 
 static inline void Text_box_get_screen_xy(int64_t* screen_x, int64_t* screen_y, const Text_box* text_box, size_t max_visual_width) {
@@ -533,7 +619,6 @@ static inline void Text_box_get_screen_xy(int64_t* screen_x, int64_t* screen_y, 
 }
 
 static inline void Text_box_scroll_if_nessessary(Text_box* text_box, int64_t main_window_height, int64_t main_window_width) {
-    //fprintf(stderr, "entering Text_box_scroll_if_nessessary(): main_window_height: %zu\n", main_window_height);
     int64_t screen_x;
     int64_t screen_y;
     Text_box_get_screen_xy(&screen_x, &screen_y, text_box, main_window_width);
@@ -549,8 +634,6 @@ static inline void Text_box_scroll_if_nessessary(Text_box* text_box, int64_t mai
     if (screen_x >= main_window_width) {
         assert(false && "not implemented");
     }
-
-    //fprintf(stderr, "exiting Text_box_scroll_if_nessessary(): main_window_height: %zu\n", main_window_height);
 }
 
 static inline void Text_box_toggle_visual_mode(Text_box* text_box) {

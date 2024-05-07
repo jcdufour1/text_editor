@@ -45,12 +45,12 @@ static void Editor_undo(Editor* editor, size_t max_visual_width) {
 
     switch (action_to_undo.action) {
     case ACTION_INSERT_CH: {
-        Text_box_del(&editor->file_text, action_to_undo.cursor, max_visual_width, false);
+        Text_box_del(&editor->file_text, action_to_undo.cursor, max_visual_width);
         Action undo_action = {.cursor = action_to_undo.cursor, .action = ACTION_BACKSPACE_CH, .ch = action_to_undo.ch};
         Actions_append(&editor->undo_actions, &undo_action);
         } break;
     case ACTION_BACKSPACE_CH: {
-        Text_box_insert(&editor->file_text, action_to_undo.ch, action_to_undo.cursor, max_visual_width, false);
+        Text_box_insert(&editor->file_text, action_to_undo.ch, action_to_undo.cursor, max_visual_width);
         Action undo_action = {.cursor = action_to_undo.cursor, .action = ACTION_INSERT_CH, .ch = action_to_undo.ch};
         Actions_append(&editor->undo_actions, &undo_action);
         } break;
@@ -66,12 +66,12 @@ static void Editor_redo(Editor* editor, size_t max_visual_width) {
 
     switch (action_to_redo.action) {
     case ACTION_INSERT_CH: {
-        Text_box_del(&editor->file_text, action_to_redo.cursor, max_visual_width, false);
+        Text_box_del(&editor->file_text, action_to_redo.cursor, max_visual_width);
         Action redo_action = {.cursor = action_to_redo.cursor, .action = ACTION_BACKSPACE_CH, .ch = action_to_redo.ch};
         Actions_append(&editor->actions, &redo_action);
         } break;
     case ACTION_BACKSPACE_CH: {
-        Text_box_insert(&editor->file_text, action_to_redo.ch, action_to_redo.cursor, max_visual_width, false);
+        Text_box_insert(&editor->file_text, action_to_redo.ch, action_to_redo.cursor, max_visual_width);
         Action redo_action = {.cursor = action_to_redo.cursor, .action = ACTION_INSERT_CH, .ch = action_to_redo.ch};
         Actions_append(&editor->actions, &redo_action);
         } break;
@@ -139,7 +139,7 @@ static void Editor_insert_into_main_file_text(Editor* editor, int new_ch, size_t
         editor->unsaved_changes = true;
     }
     Action new_action = {.cursor = editor->file_text.cursor, .action = ACTION_INSERT_CH, .ch = new_ch};
-    Text_box_insert(&editor->file_text, new_ch, index, max_visual_width, false);
+    Text_box_insert(&editor->file_text, new_ch, index, max_visual_width);
     Actions_append(&editor->actions, &new_action);
     editor->unsaved_changes = true;
 
@@ -161,7 +161,7 @@ static void Editor_del_main_file_text(Editor* editor, size_t max_visual_width) {
     int ch_to_del = editor->file_text.string.str[editor->file_text.cursor - 1];
     Action new_action = {.cursor = editor->file_text.cursor - 1, .action = ACTION_BACKSPACE_CH, .ch = ch_to_del};
     Actions_append(&editor->actions, &new_action);
-    if (Text_box_del(&editor->file_text, editor->file_text.cursor - 1, max_visual_width, false) && !editor->unsaved_changes) {
+    if (Text_box_del(&editor->file_text, editor->file_text.cursor - 1, max_visual_width) && !editor->unsaved_changes) {
         const char* unsaved_changes_text = "unsaved changes";
         String_cpy_from_cstr(&editor->save_info.string, unsaved_changes_text, strlen(unsaved_changes_text));
         editor->unsaved_changes = true;

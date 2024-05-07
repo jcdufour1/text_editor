@@ -231,16 +231,16 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
             Editor_redo(editor, windows->main.width);
         } break;
         case KEY_LEFT: {
-            Text_box_move_cursor(&editor->file_text, DIR_LEFT, windows->main.width, true);
+            Text_box_move_cursor(&editor->file_text, DIR_LEFT, windows->main.width);
         } break;
         case KEY_RIGHT: {
-            Text_box_move_cursor(&editor->file_text, DIR_RIGHT, windows->main.width, true);
+            Text_box_move_cursor(&editor->file_text, DIR_RIGHT, windows->main.width);
         } break;
         case KEY_UP: {
-            Text_box_move_cursor(&editor->file_text, DIR_UP, windows->main.width, true);
+            Text_box_move_cursor(&editor->file_text, DIR_UP, windows->main.width);
         } break;
         case KEY_DOWN: {
-            Text_box_move_cursor(&editor->file_text, DIR_DOWN, windows->main.width, true);
+            Text_box_move_cursor(&editor->file_text, DIR_DOWN, windows->main.width);
         } break;
         case KEY_BACKSPACE: {
             if (editor->file_text.cursor > 0) {
@@ -275,10 +275,10 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
             //editor_save(editor);
         } break;
         case KEY_LEFT: {
-            Text_box_move_cursor(&editor->search_query, DIR_LEFT, windows->info.width, true);
+            Text_box_move_cursor(&editor->search_query, DIR_LEFT, windows->info.width);
         } break;
         case KEY_RIGHT: {
-            Text_box_move_cursor(&editor->search_query, DIR_RIGHT, windows->info.width, true);
+            Text_box_move_cursor(&editor->search_query, DIR_RIGHT, windows->info.width);
         } break;
         case KEY_UP: {
             //assert(false && "not implemented");
@@ -288,7 +288,7 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
         } break;
         case KEY_BACKSPACE: {
             if (editor->search_query.cursor > 0) {
-                Text_box_del(&editor->search_query, editor->search_query.cursor - 1, windows->main.width, true);
+                Text_box_del(&editor->search_query, editor->search_query.cursor - 1, windows->main.width);
             }
         } break;
         case ctrl('n'): // fallthrough
@@ -338,7 +338,7 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
             }
         } break;
         default: {
-            Text_box_insert(&editor->search_query, new_ch, editor->search_query.cursor, windows->main.width, true);
+            Text_box_insert(&editor->search_query, new_ch, editor->search_query.cursor, windows->main.width);
         } break;
         }
     } break;
@@ -428,7 +428,7 @@ static void parse_args(Editor* editor, int argc, char** argv) {
         }
         int curr_char = getc(f);
         while (!feof(f)) {
-            Text_box_append(&editor->file_text, curr_char, 1000000, false);
+            Text_box_append(&editor->file_text, curr_char, 1000000);
             curr_char = getc(f);
         }
         fclose(f);

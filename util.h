@@ -24,11 +24,16 @@ static const char* quit_confirm_text = "Are you sure that you want to exit witho
 
 #define todo(...) do {assert(false && "not implemented:" && __VA_ARGS__);} while(0)
 
+//#define LOG_EVERYTHING 1
+#ifdef LOG_EVERYTHING
 #define debug(...) do { \
         fprintf(stderr, "file:%s:%d:", __FILE__, __LINE__); \
         fprintf(stderr, __VA_ARGS__); \
         fprintf(stderr, "\n"); \
     } while(0)
+#else
+#define debug(...) 
+#endif // LOG_EVERYTHING
 
 typedef enum {SEARCH_DIR_FORWARDS, SEARCH_DIR_BACKWARDS} SEARCH_DIR;
 
