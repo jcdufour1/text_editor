@@ -58,9 +58,9 @@ static void draw_cursor(WINDOW* window, int64_t window_height, int64_t window_wi
         assert(false && "not implemented");
     }
 
-    int64_t screen_x;
-    int64_t screen_y;
-    Text_box_get_screen_xy(&screen_x, &screen_y, text_box, window_width);
+    int64_t screen_x = Text_box_get_cursor_screen_x(text_box);
+    int64_t screen_y = Text_box_get_cursor_screen_y(text_box);
+    //Text_box_get_screen_xy(&screen_x, &screen_y, text_box, window_width);
     assert(window_width >= 1);
     assert(window_height >= 1);
     assert(screen_x < window_width);
@@ -84,11 +84,10 @@ static void Windows_do_resize(Windows* windows, Editor* editor) {
 
 
 
-    int64_t screen_x;
-    int64_t screen_y;
-    Text_box_get_screen_xy(&screen_x, &screen_y, &editor->file_text, windows->total_width);
-    editor->file_text.visual_x = screen_x;
-    editor->file_text.visual_y = screen_y;
+    (void) editor;
+    //Text_box_get_screen_xy(&screen_x, &screen_y, &editor->file_text, windows->total_width);
+    //editor->file_text.visual_x = screen_x;
+    //editor->file_text.visual_y = screen_y;
 }
 
 static void draw_main_window(WINDOW* window, int window_height, int window_width, const Editor* editor) {
@@ -97,22 +96,26 @@ static void draw_main_window(WINDOW* window, int window_height, int window_width
         assert(false && "not implemented");
     }
 
-    size_t index;
-    Text_box_get_index_scroll_offset(&index, &editor->file_text, window_width);
+    size_t scroll_offset;
+    scroll_offset = editor->file_text.scroll_offset;
+    size_t scroll_offset_check;
+    Text_box_cal_index_scroll_offset(&scroll_offset_check, &editor->file_text, window_width);
+    debug("scroll_offset: %zu; scroll_offset_check: %zu", scroll_offset, scroll_offset_check);
+    assert(scroll_offset == scroll_offset_check);
 
     if (editor->file_text.string.count > 0) {
-        mvwprintw(window, 0, 0, "%.*s\n", editor->file_text.string.count, editor->file_text.string.str + index);
+        mvwprintw(window, 0, 0, "%.*s\n", editor->file_text.string.count, editor->file_text.string.str + scroll_offset);
     }
 
     int64_t visual_x, visual_y;
-    switch (editor->file_text.visual.state) {
+    switch (editor->file_text.visual_sel.state) {
     case VIS_STATE_NONE:
         break;
     case VIS_STATE_START: // fallthrough
     case VIS_STATE_END:
-        assert(editor->file_text.visual.end >= editor->file_text.visual.start);
-        for (int64_t idx_visual = editor->file_text.visual.start; idx_visual <= (int64_t)editor->file_text.visual.end; idx_visual++) {
-            Text_box_get_screen_xy_at_cursor_pos(&visual_x, &visual_y, &editor->file_text, idx_visual, window_width);
+/*abc*/ assert(editor->file_text.visual_sel.end >= editor->file_text.visual_sel.start);
+/*abcdef*/for (int64_t idx_visual = editor->file_text.visual_sel.start; idx_visual <= (int64_t)editor->file_text.visual_sel.end; idx_visual++) {
+/*ghijkl*/  Text_box_get_screen_xy_at_cursor_pos(&visual_x, &visual_y, &editor->file_text, idx_visual, window_width);
             //fprintf(stderr, "thing123  visual_x: %zi    visual_y: %zi\n", visual_x, visual_y);
 
             if (visual_y < 0) {
@@ -181,7 +184,7 @@ static void Windows_init(Windows* windows) {
     memset(windows, 0, sizeof(*windows));
 }
 
-static void process_next_input(bool* should_resize_window, Windows* windows, Editor* editor, bool* should_close) {
+static void process_next_input(bool* should_resize_window, const Windows* windows, Editor* editor, bool* should_close) {
     *should_resize_window = false;
 
     switch (editor->state) {
@@ -190,7 +193,7 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
         int new_ch = wgetch(windows->main.window);
         switch (new_ch) {
         case KEY_RESIZE: {
-            Windows_do_resize(windows, editor);
+            *should_resize_window = true;
         } break;
         case ctrl('i'): {
             editor->state = STATE_COMMAND;
@@ -219,7 +222,7 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
                 editor->gen_info_state = GEN_INFO_OLDEST_CHANGE;
                 break;
             }
-            Editor_undo(editor, windows->main.width);
+            Editor_undo(editor, windows->main.width, windows->main.height);
         } break;
         case ctrl('y'): {
             if (editor->undo_actions.count < 1) {
@@ -228,30 +231,30 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
                 editor->gen_info_state = GEN_INFO_NEWEST_CHANGE;
                 break;
             }
-            Editor_redo(editor, windows->main.width);
+            Editor_redo(editor, windows->main.width, windows->main.height);
         } break;
         case KEY_LEFT: {
-            Text_box_move_cursor(&editor->file_text, DIR_LEFT, windows->main.width);
+            Text_box_move_cursor(&editor->file_text, DIR_LEFT, windows->main.width, windows->main.height);
         } break;
         case KEY_RIGHT: {
-            Text_box_move_cursor(&editor->file_text, DIR_RIGHT, windows->main.width);
+            Text_box_move_cursor(&editor->file_text, DIR_RIGHT, windows->main.width, windows->main.height);
         } break;
         case KEY_UP: {
-            Text_box_move_cursor(&editor->file_text, DIR_UP, windows->main.width);
+            Text_box_move_cursor(&editor->file_text, DIR_UP, windows->main.width, windows->main.height);
         } break;
         case KEY_DOWN: {
-            Text_box_move_cursor(&editor->file_text, DIR_DOWN, windows->main.width);
+            Text_box_move_cursor(&editor->file_text, DIR_DOWN, windows->main.width, windows->main.height);
         } break;
         case KEY_BACKSPACE: {
             if (editor->file_text.cursor > 0) {
-                Editor_del_main_file_text(editor, windows->main.width);
+                Editor_del_main_file_text(editor, windows->main.width, windows->main.height);
             }
         } break;
         case KEY_ENTER: {
-            Editor_insert_into_main_file_text(editor, '\n', editor->file_text.cursor, windows->main.width);
+            Editor_insert_into_main_file_text(editor, '\n', editor->file_text.cursor, windows->main.width, windows->main.height);
         } break;
         default: {
-            Editor_insert_into_main_file_text(editor, new_ch, editor->file_text.cursor, windows->main.width);
+            Editor_insert_into_main_file_text(editor, new_ch, editor->file_text.cursor, windows->main.width, windows->main.height);
         } break;
     } break;
     }
@@ -260,7 +263,7 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
         int new_ch = wgetch(windows->main.window);
         switch (new_ch) {
         case KEY_RESIZE: {
-            Windows_do_resize(windows, editor);
+            *should_resize_window = true;
         } break;
         case ctrl('i'): {
             editor->state = STATE_INSERT;
@@ -275,10 +278,10 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
             //editor_save(editor);
         } break;
         case KEY_LEFT: {
-            Text_box_move_cursor(&editor->search_query, DIR_LEFT, windows->info.width);
+            Text_box_move_cursor(&editor->search_query, DIR_LEFT, windows->info.width, windows->main.height);
         } break;
         case KEY_RIGHT: {
-            Text_box_move_cursor(&editor->search_query, DIR_RIGHT, windows->info.width);
+            Text_box_move_cursor(&editor->search_query, DIR_RIGHT, windows->info.width, windows->main.height);
         } break;
         case KEY_UP: {
             //assert(false && "not implemented");
@@ -288,7 +291,7 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
         } break;
         case KEY_BACKSPACE: {
             if (editor->search_query.cursor > 0) {
-                Text_box_del(&editor->search_query, editor->search_query.cursor - 1, windows->main.width);
+                Text_box_del(&editor->search_query, editor->search_query.cursor - 1, windows->main.width, windows->main.height);
             }
         } break;
         case ctrl('n'): // fallthrough
@@ -305,7 +308,13 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
                 assert(false && "unreachable");
                 abort();
             }
-            if (Text_box_do_search(&editor->file_text, &editor->search_query.string, SEARCH_DIR_FORWARDS)) {
+            if (Text_box_do_search(
+                    &editor->file_text,
+                    &editor->search_query.string,
+                    SEARCH_DIR_FORWARDS,
+                    windows->main.width,
+                    windows->main.height
+                )) {
                 editor->search_status = SEARCH_REPEAT;
                 String_cpy_from_cstr(&editor->general_info.string, search_text, strlen(search_text));
             } else {
@@ -330,7 +339,13 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
                 assert(false && "unreachable");
                 abort();
             }
-            if (Text_box_do_search(&editor->file_text, &editor->search_query.string, SEARCH_DIR_BACKWARDS)) {
+            if (Text_box_do_search(
+                    &editor->file_text,
+                    &editor->search_query.string,
+                    SEARCH_DIR_BACKWARDS,
+                    windows->main.width,
+                    windows->main.height
+                )) {
                 editor->search_status = SEARCH_REPEAT;
                 String_cpy_from_cstr(&editor->general_info.string, search_text, strlen(search_text));
             } else {
@@ -338,7 +353,7 @@ static void process_next_input(bool* should_resize_window, Windows* windows, Edi
             }
         } break;
         default: {
-            Text_box_insert(&editor->search_query, new_ch, editor->search_query.cursor, windows->main.width);
+            Text_box_insert(&editor->search_query, new_ch, editor->search_query.cursor, windows->main.width, windows->main.height);
         } break;
         }
     } break;
@@ -428,7 +443,7 @@ static void parse_args(Editor* editor, int argc, char** argv) {
         }
         int curr_char = getc(f);
         while (!feof(f)) {
-            Text_box_append(&editor->file_text, curr_char, 1000000);
+            Text_box_append(&editor->file_text, curr_char, 1000000, 10000000);
             curr_char = getc(f);
         }
         fclose(f);
@@ -459,9 +474,11 @@ void test_template_Text_box_get_index_scroll_offset(const char* text, size_t scr
     assert(0 == strcmp(text_box->string.str, text));
     text_box->scroll_y = scroll_y;
     size_t index;
-    debug("before test_string: %s; scroll_y: %zu; expected_offset: %zu", text, scroll_y, expected_offset);
-    Text_box_get_index_scroll_offset(&index, text_box, 1000000);
-    debug("after test_string: %s; scroll_y: %zu; index: %zu; expected_offset: %zu", text, scroll_y, index, expected_offset);
+    debug("before: scroll_y: %zu; expected_offset: %zu", scroll_y, expected_offset);
+    Text_box_cal_index_scroll_offset(&index, text_box, 100000);
+    // TODO: uncomment assert below
+    //assert(index == text_box->scroll_offset && "text_box->scroll_offset is invalid");
+    debug("after: scroll_y: %zu; index: %zu; expected_offset: %zu", scroll_y, index, expected_offset);
     debug(" ");
     assert(expected_offset == index && "test failed");
     free(text_box);
@@ -472,6 +489,7 @@ void test_Text_box_get_index_scroll_offset(void) {
     test_template_Text_box_get_index_scroll_offset("hello\nworld\n", 1, 6);
 
     test_template_Text_box_get_index_scroll_offset("hello\n\nworld\n", 0, 0);
+    debug("ejflkajeflk");
     test_template_Text_box_get_index_scroll_offset("hello\n\nworld\n", 1, 6);
     test_template_Text_box_get_index_scroll_offset("hello\n\nworld\n", 2, 7);
 
@@ -565,7 +583,7 @@ int main(int argc, char** argv) {
 
     String_cpy_from_cstr(&editor->general_info.string, insert_text, strlen(insert_text));
 
-    Text_box_scroll_if_nessessary(&editor->file_text, windows->main.height, windows->main.width);
+    Text_box_recalculate_visual_xy_and_scroll_offset(&editor->file_text, windows->main.width, windows->main.height);
 
     bool should_close = false;
     bool should_resize_window = true;
@@ -578,11 +596,12 @@ int main(int argc, char** argv) {
             Windows_do_resize(windows, editor);
             assert(windows->main.width >= 1);
             assert(windows->main.height >= 1);
+            Text_box_recalculate_visual_xy_and_scroll_offset(&editor->file_text, windows->main.width, windows->main.height);
         }
 
         // scroll if nessessary
         debug("scroll_if_nessessary");
-        Text_box_scroll_if_nessessary(&editor->file_text, windows->main.height, windows->main.width);
+        //Text_box_scroll_if_nessessary(&editor->file_text, windows->main.height, windows->main.width);
         //wmove(windows->info, 0, 0);
         
         //debug("draw main window");
@@ -597,8 +616,9 @@ int main(int argc, char** argv) {
         draw_cursor(windows->main.window, windows->main.height, windows->main.width, &editor->file_text, editor->state);
 
         // get and process next keystroke
-        debug("process_next_input; visual_x: %zu; visual_y: %zu", editor->file_text.visual_x, editor->file_text.visual_y);
+        debug("BEFORE process_next_input; visual_x: %zu; visual_y: %zu", editor->file_text.visual_x, editor->file_text.visual_y);
         process_next_input(&should_resize_window, windows, editor, &should_close);
+        debug("AFTER process_next_input; visual_x: %zu; visual_y: %zu", editor->file_text.visual_x, editor->file_text.visual_y);
         assert(editor->file_text.cursor < editor->file_text.string.count + 1);
     }
     endwin();
