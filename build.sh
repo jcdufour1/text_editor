@@ -2,7 +2,7 @@
 
 set -xe
 
-cc -Wall -Wextra -Werror -Wno-unused-function -pedantic -g -std=c99 -o new_text_editor main.c -lncurses
+cc -Wall -Wextra -Werror -Wno-unused-function -pedantic -g -std=c99 -o new_text_editor main.c -lncurses -pg
 #cc -O3 -DNDEBUG -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-function -pedantic -g -std=c99 -o new_text_editor main.c -lncurses
 #cc -O3 -Wall -Wextra -Werror -Wno-unused-function -pedantic -g -std=c99 -o new_text_editor main.c -lncurses
 

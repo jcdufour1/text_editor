@@ -98,13 +98,31 @@ static void draw_main_window(WINDOW* window, int window_height, int window_width
 
     size_t scroll_offset;
     scroll_offset = editor->file_text.scroll_offset;
+
+#ifdef DO_EXTRA_CHECKS
     size_t scroll_offset_check;
     Text_box_cal_index_scroll_offset(&scroll_offset_check, &editor->file_text, window_width);
     debug("scroll_offset: %zu; scroll_offset_check: %zu", scroll_offset, scroll_offset_check);
     assert(scroll_offset == scroll_offset_check);
+#endif
+
+    size_t end_last_displayed_line;
+    STATUS_GET_LAST_LINE status_get_last_line = get_end_last_displayed_line_from_cursor(
+        &end_last_displayed_line,
+        &editor->file_text,
+        editor->file_text.cursor,
+        editor->file_text.visual_x,
+        window_height,
+        window_width
+    );
+    assert(status_get_last_line == STATUS_LAST_LINE_END_BUFFER || status_get_last_line == STATUS_LAST_LINE_SUCCESS);
 
     if (editor->file_text.string.count > 0) {
-        mvwprintw(window, 0, 0, "%.*s\n", editor->file_text.string.count, editor->file_text.string.str + scroll_offset);
+        mvwprintw(
+            window, 0, 0, "%.*s\n",
+            end_last_displayed_line - (scroll_offset + 1),
+            editor->file_text.string.str + scroll_offset
+        );
     }
 
     int64_t visual_x, visual_y;
