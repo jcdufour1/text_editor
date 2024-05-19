@@ -630,6 +630,11 @@ int main(int argc, char** argv) {
             Text_box_recalculate_visual_xy_and_scroll_offset(&editor->file_text, windows->main.width, windows->main.height);
         }
 
+        draw_main_window(windows->main.window, windows->main.height, windows->main.width, editor);
+        draw_info_window(windows->info.window, editor);
+        wrefresh(windows->main.window);
+        wrefresh(windows->info.window);
+
         // position and draw cursor
         debug("draw cursor");
         draw_cursor(windows->main.window, &editor->file_text, editor->state);
