@@ -3,6 +3,9 @@
 This is a text editor, written in c.
 
 ## build
+### dependencies
+- ncurses
+
 ### release build
 ```
 $ ./build_release.sh
