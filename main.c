@@ -12,10 +12,16 @@
 #include "text_box.h"
 
 // TODO: rope?
-// TODO: text wrap (things are broken when there is text wrap)
-// TODO: set info text to say "copied", etc. when copying
+// TODO: some edge cases with scrolling feeling weird (ie. at bottom of file)
 // TODO: copy/paste to/from system clipboard
+// TODO: set info text to say "copied", etc. when copying
 // TODO: make way to pipe text into grep and jump to result, similar to :grep in vim
+// TODO: utf-8
+// TODO: keyremapping at runtime
+// TODO: cursor for info text_box is wrong if text wraps
+// TODO: tab and carriage return characters being displayed
+// TODO: option to load/create file as command (and file manager)
+// TODO: visual selection optiomization
 
 typedef struct {
     int height;
@@ -31,7 +37,7 @@ typedef struct {
     Text_win info;
 } Windows;
 
-static void draw_cursor(WINDOW* window, int64_t window_height, int64_t window_width, const Text_box* text_box, ED_STATE editor_state) {
+static void draw_cursor(WINDOW* window, const Text_box* text_box, ED_STATE editor_state) {
     (void) editor_state;
     /*
     switch (editor_state) {
@@ -61,10 +67,6 @@ static void draw_cursor(WINDOW* window, int64_t window_height, int64_t window_wi
     int64_t screen_x = Text_box_get_cursor_screen_x(text_box);
     int64_t screen_y = Text_box_get_cursor_screen_y(text_box);
     //Text_box_get_screen_xy(&screen_x, &screen_y, text_box, window_width);
-    assert(window_width >= 1);
-    assert(window_height >= 1);
-    assert(screen_x < window_width);
-    assert(screen_y < window_height);
     wmove(window, screen_y, screen_x);
 
 }
@@ -117,7 +119,9 @@ static void draw_main_window(WINDOW* window, int window_height, int window_width
         window_height,
         window_width
     );
-    assert(status_get_last_line == STATUS_LAST_LINE_END_BUFFER || status_get_last_line == STATUS_LAST_LINE_SUCCESS);
+    if (!(status_get_last_line == STATUS_LAST_LINE_END_BUFFER || status_get_last_line == STATUS_LAST_LINE_SUCCESS)) {
+        abort();
+    }
 
     debug("end_last_displayed_line: %zu", end_last_displayed_line);
     if (editor->file_text.string.count > 0) {
@@ -503,6 +507,7 @@ void test_Text_box_scroll_if_nessessary(void) {
     free(editor);
 }
 
+#ifndef DO_NO_TESTS
 void test_template_Text_box_get_index_scroll_offset(const char* text, size_t scroll_y, size_t expected_offset) {
     Text_box* text_box = safe_malloc(sizeof(*text_box));
     memset(text_box, 0, sizeof(*text_box));
@@ -584,9 +589,12 @@ void do_tests(void) {
     test_get_index_start_next_line();
     test_Text_box_get_index_scroll_offset();
 }
+#endif // DO_NO_TESTS
 
 int main(int argc, char** argv) {
-    do_tests();
+#   ifndef DO_NO_TESTS
+        do_tests();
+#   endif // DO_NO_TESTS
 
     Editor* editor = Editor_get();
     Windows* windows = safe_malloc(sizeof(*windows));
@@ -651,7 +659,7 @@ int main(int argc, char** argv) {
 
         // position and draw cursor
         debug("draw cursor");
-        draw_cursor(windows->main.window, windows->main.height, windows->main.width, &editor->file_text, editor->state);
+        draw_cursor(windows->main.window, &editor->file_text, editor->state);
 
         // get and process next keystroke
         debug("BEFORE process_next_input; visual_x: %zu; visual_y: %zu", editor->file_text.visual_x, editor->file_text.visual_y);
