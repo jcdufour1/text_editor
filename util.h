@@ -34,7 +34,7 @@ static FILE* log_file;
         fprintf(log_file, "file:%s:%d:", __FILE__, __LINE__); \
         fprintf(log_file, __VA_ARGS__); \
         fprintf(log_file, "\n"); \
-        /*fflush(log_file);*/ \
+        fflush(log_file); \
     } while(0)
 #else
 #define debug(...) 
@@ -44,7 +44,7 @@ static FILE* log_file;
         fprintf(log_file, "file:%s:%d:", __FILE__, __LINE__); \
         fprintf(log_file, __VA_ARGS__); \
         fprintf(log_file, "\n"); \
-        /*fflush(log_file);*/ \
+        fflush(log_file); \
     } while(0)
 
 typedef enum {SEARCH_DIR_FORWARDS, SEARCH_DIR_BACKWARDS} SEARCH_DIR;

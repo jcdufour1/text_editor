@@ -15,14 +15,13 @@
 // TODO: some edge cases with scrolling feeling weird (ie. at bottom of file)
 // TODO: copy/paste to/from system clipboard
 // TODO: set info text to say "copied", etc. when copying
+// TODO: make way to pipe text into grep and jump to result, similar to :grep in vim
 // TODO: utf-8
 // TODO: keyremapping at runtime
 // TODO: cursor for info text_box is wrong if text wraps
 // TODO: tab and carriage return characters being displayed
 // TODO: option to load/create file as command (and file manager)
-// TODO: visual selection optimization
-
-// TODO: make way to pipe text into grep and jump to result, similar to :grep in vim
+// TODO: visual selection optiomization
 
 typedef struct {
     int height;
