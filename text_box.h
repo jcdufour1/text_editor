@@ -112,6 +112,7 @@ static inline bool get_start_curr_generic_line_from_curr_cursor_x_pos(
     //debug("get_start_curr_generic_line_from_curr_cursor_x_pos entering: cursor: %zu; curr_visual_x: %zu", cursor, curr_visual_x);
 
     if (curr_cursor >= text->string.count) {
+        assert(curr_cursor == text->string.count);
         // no more lines are remaining
         return false;
     }
@@ -155,7 +156,7 @@ static inline bool get_start_curr_generic_line_from_curr_cursor_x_pos(
 
         if (text->string.str[curr_cursor] == '\n' || text->string.str[curr_cursor] == '\r') {
             if (is_visual) {
-                //debug("get_start_curr_generic_line_from_curr_cursor_x_pos: IS_VISUAL FAIL: curr_visual_x: %zu", curr_visual_x);
+                debug("get_start_curr_generic_line_from_curr_cursor_x_pos: IS_VISUAL FAIL: curr_visual_x: %zu", curr_visual_x);
             }
             assert(!is_visual && "unreachable when is_visual");
 
@@ -243,18 +244,66 @@ static inline bool get_start_prev_generic_line_from_curr_cursor_x_pos(
     bool is_visual
 ) {
 
-    size_t start_curr_line;
-    if (!get_start_curr_generic_line_from_curr_cursor_x_pos(
-        &start_curr_line,
-        text,
-        cursor,
-        curr_visual_x,
-        is_visual
-    )) {
-        return false;
-    };
+    bool skip_curr_thing = false;
+    assert(cursor <= text->string.count);
 
-    //debug("thing 4: start_curr_line: %zu", start_curr_line);
+
+    /*
+    if (cursor == text->string.count) {
+        debug("yes 5672");
+        if (Text_box_at(text, cursor) == '\n' || Text_box_at(text, cursor) == '\r') {
+            skip_curr_thing = true;
+            debug("thing 675: curr_visual_x: %zu", curr_visual_x);
+        } else {
+            size_t start_curr_actual_line;
+            //debug("thing 456");
+            get_start_curr_actual_line_from_curr_cursor(&start_curr_actual_line, text, cursor - 1);
+
+            size_t len_curr_actual_line = cursor - 1 - start_curr_actual_line;
+            curr_visual_x = (len_curr_actual_line - 1) % max_visual_width;
+            debug("thing 1675: curr_visual_x: %zu", curr_visual_x);
+        }
+        cursor--;
+    } 
+    */
+
+    if ((!is_visual) && cursor == text->string.count) {
+        todo("");
+    }
+    if (is_visual && cursor == text->string.count) {
+        if (Text_box_at(text, cursor) == '\n' || Text_box_at(text, cursor) == '\r') {
+            //todo("");
+        } else {
+            cursor--;
+        }
+
+        size_t start_curr_actual_line;
+        //debug("thing 456");
+        get_start_curr_actual_line_from_curr_cursor(&start_curr_actual_line, text, cursor);
+
+        size_t len_curr_actual_line = cursor - start_curr_actual_line + 1;
+        curr_visual_x = (len_curr_actual_line - 1) % max_visual_width;
+        debug("thing 324: curr_visual_x: %zu", curr_visual_x);
+
+        if (Text_box_at(text, cursor) == '\n' || Text_box_at(text, cursor) == '\r') {
+            // cursor already within prev visual line
+            *result = cursor - curr_visual_x;
+            return true;
+        }
+    }
+
+    size_t start_curr_line;
+    if (!skip_curr_thing) {
+        if (!get_start_curr_generic_line_from_curr_cursor_x_pos(
+            &start_curr_line,
+            text,
+            cursor,
+            curr_visual_x,
+            is_visual
+        )) {
+            return false;
+        }
+    }
 
     if (start_curr_line < 1) {
         // there are no previous lines
@@ -263,9 +312,11 @@ static inline bool get_start_prev_generic_line_from_curr_cursor_x_pos(
 
     // get to end of previous line
     size_t end_prev_line = start_curr_line - 1;
+
     if (is_visual) {
         //debug("thing 45");
-        //print_chars_near_cursor(text, end_prev_line); // should be start of prev visual line
+        print_chars_near_cursor(text, end_prev_line); // should be start of prev visual line
+        debug("thing 12342: start_curr_line: %zu", start_curr_line);
         if (Text_box_at(text, end_prev_line) == '\r' || Text_box_at(text, end_prev_line) == '\n') {
             size_t start_curr_actual_line;
             //debug("thing 456");
@@ -624,10 +675,14 @@ static inline void Text_box_move_cursor(Text_box* text_box, DIRECTION direction,
         case DIR_RIGHT: {
             if (text_box->cursor >= text_box->string.count) {
                 // cursor is already at end of the buffer
+                debug("DIR_RIGHT: exiting at beginning");
                 break;
             }
 
+
+            print_chars_near_cursor(text_box, text_box->cursor);
             if (Text_box_at(text_box, text_box->cursor) == '\n') {
+                debug("DIR_RIGHT: yes");
                 if (text_box->cursor < text_box->string.count && Text_box_at(text_box, text_box->cursor + 1) == '\r') {
                     text_box->cursor++;
                     //text_box->scroll_offset++; // moving screen cursor pos
@@ -637,6 +692,7 @@ static inline void Text_box_move_cursor(Text_box* text_box, DIRECTION direction,
                 text_box->visual_x = 0;
                 text_box->visual_y++;
             } else {
+                debug("DIR_RIGHT: no");
                 text_box->visual_x += 1;
             }
 
@@ -660,13 +716,25 @@ static inline void Text_box_move_cursor(Text_box* text_box, DIRECTION direction,
                 break;
             }
 
-            size_t start_curr_line;
-            if (!get_start_curr_visual_line_from_curr_cursor_x(&start_curr_line, text_box, text_box->cursor, text_box->visual_x)) {
-                assert(false);
-                abort();
+            if (text_box->cursor == text_box->string.count) {
+                Text_box_move_cursor(text_box, DIR_LEFT, max_visual_width, max_visual_height);
+                break;
             }
+
+            size_t curr_cursor = text_box->cursor;
+            size_t curr_visual_x = text_box->visual_x;
+
+            assert(curr_cursor <= text_box->string.count);
+            size_t start_curr_line;
+            if (curr_cursor < text_box->string.count) {
+                if (!get_start_curr_visual_line_from_curr_cursor_x(&start_curr_line, text_box, curr_cursor, curr_visual_x)) {
+                    assert(false);
+                    abort();
+                }
+            }
+
             size_t start_prev_line;
-            if (!get_start_prev_visual_line_from_curr_cursor_x(&start_prev_line, text_box, text_box->cursor, text_box->visual_x, max_visual_width)) {
+            if (!get_start_prev_visual_line_from_curr_cursor_x(&start_prev_line, text_box, curr_cursor, curr_visual_x, max_visual_width)) {
                 assert(false);
                 abort();
             }
@@ -703,6 +771,14 @@ static inline void Text_box_move_cursor(Text_box* text_box, DIRECTION direction,
                 Text_box_at(text_box, text_box->scroll_offset)
             );
             */
+
+            debug(
+                "UP after: Text_box_get_cursor_screen_y(text_box): %zu; text_box->visual_y: %zu; start_curr_line: %zu; start_prev_line: %zu",
+                Text_box_get_cursor_screen_y(text_box),
+                text_box->visual_y,
+                start_curr_line,
+                start_prev_line
+            );
 
             //print_chars_near_cursor(text_box, text_box->scroll_offset);
 
@@ -1046,7 +1122,8 @@ typedef enum {
     STATUS_LAST_LINE_SUCCESS,
 } STATUS_GET_LAST_LINE;
 
-static inline STATUS_GET_LAST_LINE get_end_last_displayed_line_from_cursor(
+static inline STATUS_GET_LAST_LINE get_end_last_displayed_visual_line_from_cursor(
+    size_t* count_lines_actually_displayed,
     size_t* end_last_displayed_line,
     const Text_box* text_box,
     size_t cursor,
@@ -1067,6 +1144,7 @@ static inline STATUS_GET_LAST_LINE get_end_last_displayed_line_from_cursor(
         )) {
             curr_cursor = text_box->string.count - 1;
             *end_last_displayed_line = curr_cursor;
+            *count_lines_actually_displayed = idx;
             return STATUS_LAST_LINE_END_BUFFER;
         }
 
@@ -1077,6 +1155,7 @@ static inline STATUS_GET_LAST_LINE get_end_last_displayed_line_from_cursor(
     // curr_cursor is now at the beginning of the next line
     
     *end_last_displayed_line = curr_cursor - 1;
+    *count_lines_actually_displayed = max_visual_height;
     return STATUS_LAST_LINE_SUCCESS;
 }
 

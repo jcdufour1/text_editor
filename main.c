@@ -107,22 +107,42 @@ static void draw_main_window(WINDOW* window, int window_height, int window_width
 #endif
 
     size_t end_last_displayed_line;
-    STATUS_GET_LAST_LINE status_get_last_line = get_end_last_displayed_line_from_cursor(
+    size_t count_lines_actually_displayed;
+    STATUS_GET_LAST_LINE status_get_last_line = get_end_last_displayed_visual_line_from_cursor(
+        &count_lines_actually_displayed,
         &end_last_displayed_line,
         &editor->file_text,
-        editor->file_text.cursor,
-        editor->file_text.visual_x,
+        scroll_offset,
+        0,
         window_height,
         window_width
     );
     assert(status_get_last_line == STATUS_LAST_LINE_END_BUFFER || status_get_last_line == STATUS_LAST_LINE_SUCCESS);
 
+    debug("end_last_displayed_line: %zu", end_last_displayed_line);
     if (editor->file_text.string.count > 0) {
+        for (size_t idx_line = 0; idx_line < (size_t)window_height; idx_line++) {
+            mvwprintw(
+                window, idx_line, 0, "\n"
+            );
+        }
+
         mvwprintw(
             window, 0, 0, "%.*s\n",
-            end_last_displayed_line - (scroll_offset + 1),
+            (end_last_displayed_line + 1) - (scroll_offset),
             editor->file_text.string.str + scroll_offset
         );
+
+        /*
+        debug("thing thing: count_lines_actually_displayed: %zu", count_lines_actually_displayed);
+        assert(count_lines_actually_displayed <= (size_t)window_height);
+        for (size_t idx_line = count_lines_actually_displayed + 1; idx_line < (size_t)window_height; idx_line++) {
+            debug("idx_line: %zu", idx_line);
+            mvwprintw(
+                window, idx_line, 0, "\n"
+            );
+        }
+        */
     }
 
     int64_t visual_x, visual_y;
@@ -636,7 +656,7 @@ int main(int argc, char** argv) {
         // get and process next keystroke
         debug("BEFORE process_next_input; visual_x: %zu; visual_y: %zu", editor->file_text.visual_x, editor->file_text.visual_y);
         process_next_input(&should_resize_window, windows, editor, &should_close);
-        debug("AFTER process_next_input; visual_x: %zu; visual_y: %zu", editor->file_text.visual_x, editor->file_text.visual_y);
+        debug("AFTER process_next_input; visual_x: %zu; visual_y: %zu; cursor: %zu", editor->file_text.visual_x, editor->file_text.visual_y, editor->file_text.cursor);
         assert(editor->file_text.cursor < editor->file_text.string.count + 1);
     }
     endwin();

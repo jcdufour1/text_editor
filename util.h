@@ -24,7 +24,7 @@ static const char* quit_confirm_text = "Are you sure that you want to exit witho
 
 #define todo(...) do {assert(false && "not implemented:" && __VA_ARGS__);} while(0)
 
-//#define LOG_EVERYTHING 1
+#define LOG_EVERYTHING 1
 #ifdef LOG_EVERYTHING
 #define debug(...) do { \
         fprintf(stderr, "file:%s:%d:", __FILE__, __LINE__); \
