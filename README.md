@@ -32,7 +32,7 @@ $ ./new_text_editor <file_to_edit>
 - find previous: ctrl-P
 
 #### command mode
-- enter insert mode: ctrl-N
+- enter insert mode: ctrl-I
 - save: s or ctrl-S
 - quit: q
 
