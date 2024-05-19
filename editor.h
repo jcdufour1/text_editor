@@ -58,6 +58,8 @@ static void Editor_undo(Editor* editor, size_t max_visual_width, size_t max_visu
         assert(false && "unreachable");
         abort();
     }
+
+    Text_box_recalculate_visual_xy_and_scroll_offset(&editor->file_text, max_visual_width, max_visual_height);
 }
 
 static void Editor_redo(Editor* editor, size_t max_visual_width, size_t max_visual_height) {
@@ -79,6 +81,8 @@ static void Editor_redo(Editor* editor, size_t max_visual_width, size_t max_visu
         assert(false && "unreachable");
         abort();
     }
+
+    Text_box_recalculate_visual_xy_and_scroll_offset(&editor->file_text, max_visual_width, max_visual_height);
 }
 
 static bool Editor_save_file(const Editor* editor) {
