@@ -12,13 +12,13 @@
 
 static const char* LOG_FILE_NAME = "new_text_editor_log.txt";
 
-static const char* insert_text = "[insert]: press ctrl-I to enter command mode or exit";
-static const char* command_text = "[command]: press q to quit. press ctrl-I to go back to insert mode";
-static const char* search_text = "[search]: press ctrl-f to go to insert mode; "
+static const char* INSERT_TEXT = "[insert]: press ctrl-I to enter command mode or exit";
+static const char* COMMAND_TEXT = "[command]: press q to quit. press ctrl-I to go back to insert mode";
+static const char* SEARCH_TEXT = "[search]: press ctrl-f to go to insert mode; "
                                  "ctrl-n or ctrl-p to go to next/previous result; " 
                                  "ctrl-h for help";
-static const char* search_failure_text = "[search]: no results. press ctrl-h for help";
-static const char* quit_confirm_text = "Are you sure that you want to exit without saving? N/y";
+static const char* SEARCH_FAILURE_TEXT = "[search]: no results. press ctrl-h for help";
+static const char* QUIT_CONFIRM_TEXT = "Are you sure that you want to exit without saving? N/y";
 
 static FILE* log_file;
 

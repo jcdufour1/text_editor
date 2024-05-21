@@ -12,7 +12,7 @@ typedef struct {
 //#define String_fmt
 
 //static void String_resize_if_nessessary(
-static void String_insert(String* string, char new_ch, size_t index) {
+static inline void String_insert(String* string, char new_ch, size_t index) {
     assert(index <= string->count);
     if (string->capacity < string->count + 1) {
         if (string->capacity == 0) {
@@ -32,7 +32,7 @@ static void String_insert(String* string, char new_ch, size_t index) {
     string->count++;
 }
 
-static void String_insert_substring(String* dest, size_t index, const String* src, size_t src_start, size_t count) {
+static inline void String_insert_substring(String* dest, size_t index, const String* src, size_t src_start, size_t count) {
     assert(index <= dest->count);
     memset(dest + index, 0, sizeof(dest->str[0]) * count);
     if (dest->capacity < dest->count + 1) {
@@ -55,11 +55,11 @@ static void String_insert_substring(String* dest, size_t index, const String* sr
     dest->count += count;
 }
 
-static void String_insert_string(String* dest, size_t index, const String* src) {
+static inline void String_insert_string(String* dest, size_t index, const String* src) {
     String_insert_substring(dest, index, src, 0, src->count);
 }
 
-static void String_cpy_from_cstr(String* dest, const char* src, size_t src_size) {
+static inline void String_cpy_from_cstr(String* dest, const char* src, size_t src_size) {
     memset(dest, 0, sizeof(*dest));
     if (dest->capacity < dest->count + 1) {
         if (dest->capacity == 0) {
@@ -80,7 +80,7 @@ static void String_cpy_from_cstr(String* dest, const char* src, size_t src_size)
     dest->count = src_size;
 }
 
-static void String_cpy_from_substring(String* dest, const String* src, size_t src_start, size_t count) {
+static inline void String_cpy_from_substring(String* dest, const String* src, size_t src_start, size_t count) {
     memset(dest, 0, sizeof(*dest));
     if (dest->capacity < count + 1) {
         if (dest->capacity == 0) {
@@ -101,11 +101,11 @@ static void String_cpy_from_substring(String* dest, const String* src, size_t sr
     dest->count = count;
 }
 
-static void String_append(String* string, int new_ch) {
+static inline void String_append(String* string, int new_ch) {
     String_insert(string, new_ch, string->count);
 }
 
-static bool String_del(String* string, size_t index) {
+static inline bool String_del(String* string, size_t index) {
     //fprintf(stderr, "String_del: index: %zu    string->count: %zu\n", index, string->count);
     assert(index < string->count);
     memmove(string->str + index, string->str + index + 1, string->count - index - 1);
@@ -113,14 +113,14 @@ static bool String_del(String* string, size_t index) {
     return true;
 }
 
-static void String_pop(char* popped_item, String* string) {
+static inline void String_pop(char* popped_item, String* string) {
     if (popped_item) {
         *popped_item = string->str[string->count - 1];
     }
     String_del(string, string->count - 1);
 }
 
-static void String_get_curr_line(char* buf, const String* string, size_t starting_index) {
+static inline void String_get_curr_line(char* buf, const String* string, size_t starting_index) {
     memset(buf, 0, 1024);
 
     while (string->str[starting_index] != '\n') {
@@ -128,6 +128,11 @@ static void String_get_curr_line(char* buf, const String* string, size_t startin
         starting_index++;
     }
 
+}
+
+static inline char String_at(const String* string, size_t index) {
+    assert(index < string->count);
+    return string->str[index];
 }
 
 
