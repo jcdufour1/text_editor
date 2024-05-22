@@ -123,11 +123,14 @@ static void Editor_save(Editor* editor) {
 }
 
 static void Editor_cpy_selection(Editor* editor) {
+    size_t start = Text_box_get_visual_sel_start(&editor->file_text);
+    size_t end = Text_box_get_visual_sel_end(&editor->file_text);
+
     String_cpy_from_substring(
         &editor->clipboard,
         &editor->file_text.string,
-        editor->file_text.visual_sel.start,
-        editor->file_text.visual_sel.end + 1 - editor->file_text.visual_sel.start
+        start,
+        end + 1 - start
     );
 }
 
@@ -138,8 +141,7 @@ static void Editor_paste_selection(Editor* editor) {
 
 static void Editor_insert_into_main_file_text(Editor* editor, int new_ch, size_t index, size_t max_visual_width, size_t max_visual_height) {
     if (!editor->unsaved_changes) {
-        const char* unsaved_changes_text = "unsaved changes";
-        String_cpy_from_cstr(&editor->save_info.string, unsaved_changes_text, strlen(unsaved_changes_text));
+        String_cpy_from_cstr(&editor->save_info.string, UNSAVED_CHANGES_TEXT, strlen(UNSAVED_CHANGES_TEXT));
         editor->unsaved_changes = true;
     }
     Action new_action = {.cursor = editor->file_text.cursor_info.cursor, .action = ACTION_INSERT_CH, .ch = new_ch};
@@ -152,7 +154,7 @@ static void Editor_insert_into_main_file_text(Editor* editor, int new_ch, size_t
         break;
     case GEN_INFO_OLDEST_CHANGE: // fallthrough
     case GEN_INFO_NEWEST_CHANGE:
-        String_cpy_from_cstr(&editor->general_info.string, COMMAND_TEXT, strlen(COMMAND_TEXT));
+        String_cpy_from_cstr(&editor->general_info.string, INSERT_TEXT, strlen(INSERT_TEXT));
         editor->gen_info_state = GEN_INFO_NORMAL;
         break;
     default:
@@ -166,8 +168,7 @@ static void Editor_del_main_file_text(Editor* editor, size_t max_visual_width, s
     Action new_action = {.cursor = editor->file_text.cursor_info.cursor - 1, .action = ACTION_BACKSPACE_CH, .ch = ch_to_del};
     Actions_append(&editor->actions, &new_action);
     if (Text_box_del(&editor->file_text, editor->file_text.cursor_info.cursor - 1, max_visual_width, max_visual_height) && !editor->unsaved_changes) {
-        const char* unsaved_changes_text = "unsaved changes";
-        String_cpy_from_cstr(&editor->save_info.string, unsaved_changes_text, strlen(unsaved_changes_text));
+        String_cpy_from_cstr(&editor->save_info.string, UNSAVED_CHANGES_TEXT, strlen(UNSAVED_CHANGES_TEXT));
         editor->unsaved_changes = true;
     }
 
@@ -176,7 +177,7 @@ static void Editor_del_main_file_text(Editor* editor, size_t max_visual_width, s
         break;
     case GEN_INFO_OLDEST_CHANGE: // fallthrough
     case GEN_INFO_NEWEST_CHANGE:
-        String_cpy_from_cstr(&editor->general_info.string, COMMAND_TEXT, strlen(COMMAND_TEXT));
+        String_cpy_from_cstr(&editor->general_info.string, INSERT_TEXT, strlen(INSERT_TEXT));
         editor->gen_info_state = GEN_INFO_NORMAL;
         break;
     default:

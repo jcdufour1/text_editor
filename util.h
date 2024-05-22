@@ -11,6 +11,8 @@
 #include <stdio.h>
 
 static const char* LOG_FILE_NAME = "new_text_editor_log.txt";
+static const char* NO_CHANGES_TEXT = "no changes";
+static const char* UNSAVED_CHANGES_TEXT = "no changes";
 
 static const char* INSERT_TEXT = "[insert]: press ctrl-I to enter command mode or exit";
 static const char* COMMAND_TEXT = "[command]: press q to quit. press ctrl-I to go back to insert mode";
@@ -28,7 +30,7 @@ static FILE* log_file;
 
 #define todo(...) do {assert(false && "not implemented:" && __VA_ARGS__);} while(0)
 
-#define LOG_EVERYTHING 1
+//#define LOG_EVERYTHING 1
 #ifdef LOG_EVERYTHING
 #define debug(...) do { \
         fprintf(log_file, "file:%s:%d:", __FILE__, __LINE__); \
