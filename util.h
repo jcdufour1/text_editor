@@ -28,7 +28,7 @@ static FILE* log_file;
 
 #define todo(...) do {assert(false && "not implemented:" && __VA_ARGS__);} while(0)
 
-//#define LOG_EVERYTHING 1
+#define LOG_EVERYTHING 1
 #ifdef LOG_EVERYTHING
 #define debug(...) do { \
         fprintf(log_file, "file:%s:%d:", __FILE__, __LINE__); \

@@ -127,7 +127,11 @@ static void draw_main_window(WINDOW* window, int window_height, int window_width
         assert(editor->file_text.visual_sel.end >= editor->file_text.visual_sel.start);
         //Text_box curr_visual_box_view;
         //Text_box_get_view_from_other(&curr_visual_box, &editor->file_text);
+        todo("");
+        Cursor_info* curr_visual = Cursor_info_get();
+        Cursor_info_cpy(curr_visual, &editor->file_text.cursor_info);
         for (int64_t idx_visual = editor->file_text.visual_sel.start; idx_visual <= (int64_t)editor->file_text.visual_sel.end; idx_visual++) {
+
             //Text_box_get_screen_xy_at_cursor_pos(&visual_x, &visual_y, &editor->file_text, idx_visual, window_width);
 
             /*
@@ -147,6 +151,21 @@ static void draw_main_window(WINDOW* window, int window_height, int window_width
                 );
             }
             */
+            CURSOR_STATUS status = Cursor_info_advance_one(curr_visual, &editor->file_text.string, window_width, true);
+            switch (status) {
+            case CUR_STATUS_AT_START_CURR_LINE:
+            case CUR_STATUS_AT_START_BUFFER: // fallthrough
+                todo("");
+                break;
+            case CUR_STATUS_AT_START_NEXT_LINE: // fallthrough
+            case CUR_STATUS_NORMAL:
+                break;
+            case CUR_STATUS_PAST_END_BUFFER: //fallthrough
+            case CUR_STATUS_ERROR: 
+                log("fetal error");
+                abort();
+                break;
+            }
         }
         break;
     default:
@@ -613,6 +632,8 @@ int main(int argc, char** argv) {
 
     Text_box_recalculate_visual_xy_and_scroll_offset(&editor->file_text, windows->main.width, windows->main.height);
 
+    log("thing size Text_box: %zu", sizeof(editor->file_text));
+
     bool should_close = false;
     bool should_resize_window = true;
     while (!should_close) {
@@ -637,9 +658,13 @@ int main(int argc, char** argv) {
         draw_cursor(windows->main.window, &editor->file_text, editor->state);
 
         // get and process next keystroke
-        debug("BEFORE process_next_input; visual_x: %zu; visual_y: %zu", editor->file_text.visual_x, editor->file_text.visual_y);
+        //debug("BEFORE process_next_input; visual_x: %zu; visual_y: %zu", editor->file_text.visual_x, editor->file_text.visual_y);
         process_next_input(&should_resize_window, windows, editor, &should_close);
-        debug("AFTER process_next_input; visual_x: %zu; visual_y: %zu; cursor: %zu", editor->file_text.visual_x, editor->file_text.visual_y, editor->file_text.cursor);
+        debug("AFTER process_next_input; visual_x: %zu; visual_y: %zu; cursor: %zu",
+            editor->file_text.cursor_info.visual_x,
+            editor->file_text.cursor_info.visual_y,
+            editor->file_text.cursor_info.cursor
+        );
         assert(editor->file_text.cursor_info.cursor < editor->file_text.string.count + 1);
     }
     endwin();
