@@ -28,11 +28,14 @@ $ ./new_text_editor <file_to_edit>
 - undo: ctrl-Z
 - redo: ctrl-Y
 - save file: ctrl-S 
+- toggle selection of text: ctrl-Q 
+- copy selected text: ctrl-C 
+- paste selected text: ctrl-V
 
 #### find mode
 - enter insert mode: ctrl-F
-- find next: ctrl-N or <CR>
-- find previous: ctrl-P
+- find next result: ctrl-N or <CR>
+- find previous result: ctrl-P
 
 #### command mode
 - enter insert mode: ctrl-I
