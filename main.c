@@ -21,6 +21,9 @@
 // TODO: tab and carriage return characters being displayed
 // TODO: option to load/create file as command (and file manager)
 // TODO: visual selection optimization
+// 
+// TODO: complete support for /n/r line ending 
+// TODO: Windows support
 
 // TODO: make way to pipe text into grep and jump to result, similar to :grep in vim
 
