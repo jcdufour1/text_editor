@@ -170,6 +170,8 @@ static inline void highlight_text_in_vis_area(WINDOW* window, const Text_box* ma
         0,
         NULL
     );
+
+    free(curr_visual);
 }
 
 static void draw_main_window(WINDOW* window, int window_height, int window_width, const Editor* editor) {
@@ -215,7 +217,7 @@ static void draw_main_window(WINDOW* window, int window_height, int window_width
         mvwprintw(
             window, 0, 0, "%.*s\n",
             (end_last_displayed_line + 1) - (scroll_offset),
-            main_box->string.str + scroll_offset
+            main_box->string.items + scroll_offset
         );
     }
 
@@ -241,11 +243,11 @@ static void draw_info_window(WINDOW* info, const Editor* editor) {
         0,
         "%.*s\n%.*s\n%.*s\n",
         editor->general_info.string.count,
-        editor->general_info.string.str,
+        editor->general_info.string.items,
         editor->search_query.string.count,
-        editor->search_query.string.str,
+        editor->search_query.string.items,
         editor->save_info.string.count,
-        editor->save_info.string.str
+        editor->save_info.string.items
     );
     mvwchgat(info, 1, editor->search_query.cursor_info.cursor, 1, A_REVERSE, 0, NULL);
 }
@@ -268,8 +270,6 @@ static void Windows_free(Windows* windows) {
 
     delwin(windows->info.window);
     delwin(windows->main.window);
-
-    free(windows);
 }
 
 static void Windows_init(Windows* windows) {
@@ -560,11 +560,11 @@ void test_Text_box_scroll_if_nessessary(void) {
 #ifndef DO_NO_TESTS
 void test_template_Text_box_get_index_scroll_offset(const char* text, size_t scroll_y, size_t expected_offset) {
     Text_box* text_box = safe_malloc(sizeof(*text_box));
-    memset(text_box, 0, sizeof(*text_box));
+    Text_box_init(text_box);
 
     String_cpy_from_cstr(&text_box->string, text, strlen(text));
-    assert(strlen(text_box->string.str) == text_box->string.count);
-    assert(0 == strcmp(text_box->string.str, text));
+    assert(strlen(text_box->string.items) == text_box->string.count);
+    assert(0 == strcmp(text_box->string.items, text));
     text_box->cursor_info.scroll_y = scroll_y;
     size_t index;
     debug("before: scroll_y: %zu; expected_offset: %zu", scroll_y, expected_offset);
@@ -574,6 +574,8 @@ void test_template_Text_box_get_index_scroll_offset(const char* text, size_t scr
     debug("after: scroll_y: %zu; index: %zu; expected_offset: %zu", scroll_y, index, expected_offset);
     debug(" ");
     assert(expected_offset == index && "test failed");
+
+    Text_box_free(text_box);
     free(text_box);
 }
 
@@ -597,6 +599,7 @@ void test_template_get_index_start_next_line(const char* test_string, size_t ind
     //size_t curr_cursor = 0;
     String test_text;
     Text_box text_box = {0};
+    String_init(&test_text);
     String_cpy_from_cstr(&test_text, test_string, strlen(test_string));
     text_box.string = test_text;
     if (!get_start_next_visual_line_from_curr_cursor_x(&result, &text_box.string, index_before, 0, 1000000)) {
@@ -604,6 +607,7 @@ void test_template_get_index_start_next_line(const char* test_string, size_t ind
     }
     debug("test_string: %s; index_before: %zu; result: %zu; expected_result: %zu", test_string, index_before, result, expected_result);
     assert(result == expected_result);
+    String_free_char_data(&test_text);
 }
 
 void test_get_index_start_next_line(void) {
@@ -726,7 +730,9 @@ int main(int argc, char** argv) {
     endwin();
 
     Editor_free(editor);
+    free(editor);
     Windows_free(windows);
+    free(windows);
 
     return 0;
 }

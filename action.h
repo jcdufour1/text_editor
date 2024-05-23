@@ -54,4 +54,18 @@ static void Actions_pop(Action* popped_item, Actions* actions) {
     Actions_del(actions, actions->count - 1);
 }
 
+static void Actions_init(Actions* actions) {
+    memset(actions, 0, sizeof(*actions));
+}
+
+
+static void Actions_free(Actions* actions) {
+    if (!actions->items || actions->capacity < 1) {
+        return;
+    }
+
+    free(actions->items);
+    memset(actions, 0, sizeof(*actions));
+}
+
 #endif // ACTION_H

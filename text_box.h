@@ -213,7 +213,7 @@ static inline CURSOR_STATUS Cursor_info_decrement_one(
     }
 
     // check for line ending if actual line
-    if (string->str[curr_cur_info->cursor - 1] == '\n' || string->str[curr_cur_info->cursor - 1] == '\r') {
+    if (String_at(string, curr_cur_info->cursor - 1) == '\n' || String_at(string, curr_cur_info->cursor - 1) == '\r') {
         if (is_visual) {
             debug("get_start_curr_generic_line_from_curr_cursor_x_pos: visual_x : %zu; curr_cursor: %zu; is_visual: %d", curr_cur_info->visual_x, curr_cur_info->cursor, is_visual);
             assert(!is_visual && "previous if statement should have caught this");
@@ -221,7 +221,7 @@ static inline CURSOR_STATUS Cursor_info_decrement_one(
         return CUR_STATUS_AT_START_CURR_LINE;
     }
 
-    if (string->str[curr_cur_info->cursor] == '\n' || string->str[curr_cur_info->cursor] == '\r') {
+    if (String_at(string, curr_cur_info->cursor) == '\n' || String_at(string, curr_cur_info->cursor) == '\r') {
         // do nothing different for now
     }
 
@@ -238,18 +238,20 @@ static inline bool get_start_next_generic_line_from_curr_cursor_x_pos(
 ) {
     //size_t curr_cursor = cursor;
 
-    Cursor_info* curr_cursor = Cursor_info_get();
-    curr_cursor->cursor = cursor;
-    curr_cursor->visual_x = visual_x_of_cursor;
+    static Cursor_info curr_cursor;
+    memset(&curr_cursor, 0, sizeof(cursor));
+
+    curr_cursor.cursor = cursor;
+    curr_cursor.visual_x = visual_x_of_cursor;
 
     // find next newline
     while (1) {
-        CURSOR_STATUS status = Cursor_info_advance_one(curr_cursor, string, max_visual_width, is_visual);
+        CURSOR_STATUS status = Cursor_info_advance_one(&curr_cursor, string, max_visual_width, is_visual);
         switch (status) {
         case CUR_STATUS_NORMAL:
             break;
         case CUR_STATUS_AT_START_NEXT_LINE:
-            *result = curr_cursor->cursor;
+            *result = curr_cursor.cursor;
             return true;
             break;
         case CUR_STATUS_PAST_END_BUFFER: // fallthrough
@@ -1045,9 +1047,12 @@ static inline void Text_box_append(Text_box* text, int new_ch, size_t max_visual
 
 static inline bool Text_box_perform_search_internal(Text_box* text_box_to_search, const String* query, SEARCH_DIR search_direction) {
     // search result put in text_box_to_search->cursor
+
     if (query->count < 1) {
         assert(false && "not implemented");
     }
+
+    const String* text_to_search = &text_box_to_search->string;
 
     switch (search_direction) {
     case SEARCH_DIR_FORWARDS: {
@@ -1061,7 +1066,7 @@ static inline bool Text_box_perform_search_internal(Text_box* text_box_to_search
             bool string_at_idx = true;
 
             for (size_t query_idx = 0; query_idx < query->count; query_idx++) {
-                if (text_box_to_search->string.str[idx_to_search + query_idx] != query->str[query_idx]) {
+                if (String_at(text_to_search, idx_to_search + query_idx) != String_at(query, query_idx)) {
                     string_at_idx = false;
                     break;
                 }
@@ -1085,7 +1090,7 @@ static inline bool Text_box_perform_search_internal(Text_box* text_box_to_search
 
             for (int64_t query_idx = query->count - 1; query_idx >= 0; query_idx--) {
                 assert((idx_to_search + query_idx) - (int64_t)query->count >= 0);
-                if (text_box_to_search->string.str[(idx_to_search + query_idx) - query->count] != query->str[query_idx]) {
+                if (String_at(text_to_search, (idx_to_search + query_idx) - query->count) != String_at(query, query_idx)) {
                     string_at_idx = false;
                     break;
                 }
@@ -1191,6 +1196,30 @@ static size_t Text_box_get_visual_sel_end(const Text_box* text_box) {
         return text_box->cursor_info.cursor;
     }
     return text_box->visual_sel.cursor_started;
+}
+
+static inline void Cursor_info_init(Cursor_info* cursor_info) {
+    memset(cursor_info, 0, sizeof(*cursor_info));
+}
+
+static inline void Visual_selected_init(Visual_selected* visual_selected) {
+    memset(visual_selected, 0, sizeof(*visual_selected));
+}
+
+static inline void Text_box_init(Text_box* text_box) {
+    memset(text_box, 0, sizeof(*text_box));
+
+    String_init(&text_box->string);
+    Cursor_info_init(&text_box->cursor_info);
+    Visual_selected_init(&text_box->visual_sel);
+}
+
+static inline void Text_box_free(Text_box* text_box) {
+    if (!text_box) {
+        return;
+    }
+
+    String_free_char_data(&text_box->string);
 }
 
 #endif // TEXT_BOX_H

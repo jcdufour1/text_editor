@@ -27,14 +27,38 @@ typedef struct {
     Actions undo_actions;
 } Editor;
 
-static Editor* Editor_get() {
-    Editor* editor = safe_malloc(sizeof(*editor));
+static inline void Editor_init(Editor* editor) {
     memset(editor, 0, sizeof(*editor));
+
+    String_init(&editor->clipboard);
+
+    Text_box_init(&editor->general_info);
+    Text_box_init(&editor->search_query);
+    Text_box_init(&editor->save_info);
+    Text_box_init(&editor->file_text);
+
+    Actions_init(&editor->actions);
+    Actions_init(&editor->undo_actions);
+}
+
+static inline Editor* Editor_get() {
+    Editor* editor = safe_malloc(sizeof(*editor));
+    Editor_init(editor);
     return editor;
 }
 
 static void Editor_free(Editor* editor) {
     (void) editor;
+    Actions_free(&editor->actions);
+    Actions_free(&editor->undo_actions);
+
+    Text_box_free(&editor->file_text);
+    Text_box_free(&editor->save_info);
+    Text_box_free(&editor->search_query);
+    Text_box_free(&editor->general_info);
+
+    String_free_char_data(&editor->clipboard);
+
     //free(editor->file_text.string);
     // TODO: actually implement this function
 }
@@ -91,13 +115,13 @@ static bool Editor_save_file(const Editor* editor) {
     const char* temp_file_name = ".temp_thingyksdjfaijdfkj.txt";
 
     // write temporary file
-    if (!actual_write(temp_file_name, editor->file_text.string.str, editor->file_text.string.count)) {
+    if (!actual_write(temp_file_name, editor->file_text.string.items, editor->file_text.string.count)) {
         return false;
     }
 
     // write actual file
     // TODO: consider if this can be done better
-    if (!actual_write(editor->file_name, editor->file_text.string.str, editor->file_text.string.count)) {
+    if (!actual_write(editor->file_name, editor->file_text.string.items, editor->file_text.string.count)) {
         return false;
     }
 
@@ -164,7 +188,7 @@ static void Editor_insert_into_main_file_text(Editor* editor, int new_ch, size_t
 }
 
 static void Editor_del_main_file_text(Editor* editor, size_t max_visual_width, size_t max_visual_height) {
-    int ch_to_del = editor->file_text.string.str[editor->file_text.cursor_info.cursor - 1];
+    int ch_to_del = String_at(&editor->file_text.string, editor->file_text.cursor_info.cursor - 1);
     Action new_action = {.cursor = editor->file_text.cursor_info.cursor - 1, .action = ACTION_BACKSPACE_CH, .ch = ch_to_del};
     Actions_append(&editor->actions, &new_action);
     if (Text_box_del(&editor->file_text, editor->file_text.cursor_info.cursor - 1, max_visual_width, max_visual_height) && !editor->unsaved_changes) {
