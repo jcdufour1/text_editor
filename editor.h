@@ -83,7 +83,7 @@ static void Editor_undo(Editor* editor, size_t max_visual_width, size_t max_visu
         abort();
     }
 
-    Text_box_recalculate_visual_xy_and_scroll_offset(&editor->file_text, max_visual_width, max_visual_height);
+    Text_box_recalculate_visual_xy_and_scroll_offset(&editor->file_text, max_visual_width);
 }
 
 static void Editor_redo(Editor* editor, size_t max_visual_width, size_t max_visual_height) {
@@ -106,7 +106,7 @@ static void Editor_redo(Editor* editor, size_t max_visual_width, size_t max_visu
         abort();
     }
 
-    Text_box_recalculate_visual_xy_and_scroll_offset(&editor->file_text, max_visual_width, max_visual_height);
+    Text_box_recalculate_visual_xy_and_scroll_offset(&editor->file_text, max_visual_width);
 }
 
 static bool Editor_save_file(const Editor* editor) {
@@ -160,7 +160,7 @@ static void Editor_cpy_selection(Editor* editor) {
 
 static void Editor_paste_selection(Editor* editor) {
     //fprintf(stderr, "Editor_paste_selection: clipboard: \"%.*s\"\n", (int)editor->clipboard.count, editor->clipboard.str);
-    String_insert_string(&editor->file_text.string, editor->file_text.cursor_info.cursor, &editor->clipboard);
+    String_insert_string(&editor->file_text.string, editor->file_text.cursor_info.pos.cursor, &editor->clipboard);
 }
 
 static void Editor_insert_into_main_file_text(Editor* editor, int new_ch, size_t index, size_t max_visual_width, size_t max_visual_height) {
@@ -168,7 +168,7 @@ static void Editor_insert_into_main_file_text(Editor* editor, int new_ch, size_t
         String_cpy_from_cstr(&editor->save_info.string, UNSAVED_CHANGES_TEXT, strlen(UNSAVED_CHANGES_TEXT));
         editor->unsaved_changes = true;
     }
-    Action new_action = {.cursor = editor->file_text.cursor_info.cursor, .action = ACTION_INSERT_CH, .ch = new_ch};
+    Action new_action = {.cursor = editor->file_text.cursor_info.pos.cursor, .action = ACTION_INSERT_CH, .ch = new_ch};
     Text_box_insert(&editor->file_text, new_ch, index, max_visual_width, max_visual_height);
     Actions_append(&editor->actions, &new_action);
     editor->unsaved_changes = true;
@@ -188,10 +188,10 @@ static void Editor_insert_into_main_file_text(Editor* editor, int new_ch, size_t
 }
 
 static void Editor_del_main_file_text(Editor* editor, size_t max_visual_width, size_t max_visual_height) {
-    int ch_to_del = String_at(&editor->file_text.string, editor->file_text.cursor_info.cursor - 1);
-    Action new_action = {.cursor = editor->file_text.cursor_info.cursor - 1, .action = ACTION_BACKSPACE_CH, .ch = ch_to_del};
+    int ch_to_del = String_at(&editor->file_text.string, editor->file_text.cursor_info.pos.cursor - 1);
+    Action new_action = {.cursor = editor->file_text.cursor_info.pos.cursor - 1, .action = ACTION_BACKSPACE_CH, .ch = ch_to_del};
     Actions_append(&editor->actions, &new_action);
-    if (Text_box_del(&editor->file_text, editor->file_text.cursor_info.cursor - 1, max_visual_width, max_visual_height) && !editor->unsaved_changes) {
+    if (Text_box_del(&editor->file_text, editor->file_text.cursor_info.pos.cursor - 1, max_visual_width, max_visual_height) && !editor->unsaved_changes) {
         String_cpy_from_cstr(&editor->save_info.string, UNSAVED_CHANGES_TEXT, strlen(UNSAVED_CHANGES_TEXT));
         editor->unsaved_changes = true;
     }
