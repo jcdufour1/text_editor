@@ -36,7 +36,6 @@ static void draw_cursor(WINDOW* window, const Text_box* text_box) {
     int64_t screen_x = Cursor_info_get_cursor_screen_x(&text_box->cursor_info);
     int64_t screen_y = Cursor_info_get_cursor_screen_y(&text_box->cursor_info);
     wmove(window, screen_y, screen_x);
-
 }
 
 static inline void highlight_text_in_vis_area(WINDOW* window, const Text_box* main_box, size_t scroll_offset, size_t window_width, size_t end_last_displayed_line) {
