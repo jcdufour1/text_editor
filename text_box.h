@@ -294,12 +294,12 @@ static inline bool get_start_next_generic_line_from_curr_cursor_x_pos(
             result->cursor = curr_pos.cursor;
             result->visual_x = curr_pos.visual_x;
             result->visual_y = curr_pos.visual_y;
-            debug("thing 129: returning");
+            //debug("thing 129: returning; result->cursor: %zu", result->cursor);
             return true;
         } break;
         case CUR_ADV_PAST_END_BUFFER: // fallthrough
             memset(result, 0, sizeof(*result));
-            debug("thing 129: return false");
+            //debug("thing 129: return false");
             return false;
         case CUR_ADV_ERROR:
             log("fetal internal error");
@@ -572,16 +572,19 @@ static inline void cal_start_generic_line_internal(
 
     // get to curr line
     while (1) {
-        debug("yes while thing");
-        //debug("get_start_curr_visual_line: curr_cursor: %zu", curr_cursor);
+        //debug("yes while thing");
+        //debug("get_start_curr_visual_line: curr_cursor: %zu", curr_cursor.cursor);
 
         // the idea is to 
         prev_cursor = curr_cursor;
 
         if (is_visual) {
-            if (!get_start_next_visual_line_from_curr_cursor_x(&curr_cursor, string, &curr_cursor, max_visual_width)) {
+            Pos_data temp;
+            if (!get_start_next_visual_line_from_curr_cursor_x(&temp, string, &curr_cursor, max_visual_width)) {
+                //debug("no thing");
                 break;
             }
+            curr_cursor = temp;
         } else {
             assert(false && "not implemented");
             //if (!get_start_next_actual_line(&curr_cursor, text, curr_cursor, 0, max_visual_width)) {
@@ -591,12 +594,12 @@ static inline void cal_start_generic_line_internal(
 
         if (curr_cursor.cursor > cursor) {
             // curr_cursor is past the cursor location
-            debug("next thing: cursor: %zu; curr_cursor->cursor: %zu; visual_y: %zu", cursor, curr_cursor.cursor, curr_cursor.visual_y);
+            //debug("next thing: cursor: %zu; curr_cursor->cursor: %zu; visual_y: %zu", cursor, curr_cursor.cursor, curr_cursor.visual_y);
             break;
         }
 
-        curr_cursor.visual_y++;
 
+        //debug("curr_cursor: %zu; prev_cursor: %zu", curr_cursor.cursor, prev_cursor.cursor);
         assert(curr_cursor.cursor > prev_cursor.cursor);
         assert(prev_cursor.cursor <= cursor);
     }
@@ -718,7 +721,7 @@ static inline size_t cal_cur_screen_y_at_cursor(const Text_box* text_box) {
 static inline void Text_box_recalculate_visual_xy_and_scroll_offset(Text_box* text_box, size_t max_visual_width) {
     text_box->cursor_info.pos.visual_x = cal_visual_x_at_cursor(&text_box->string, text_box->cursor_info.pos.cursor, max_visual_width);
     text_box->cursor_info.pos.visual_y = cal_visual_y_at_cursor(&text_box->string, text_box->cursor_info.pos.cursor, max_visual_width);
-    debug("visual_y cal thing: %zu", text_box->cursor_info.pos.visual_y);
+    debug("visual_y cal thing: %zu; cursor: %zu", text_box->cursor_info.pos.visual_y, text_box->cursor_info.pos.cursor);
 
     text_box->cursor_info.scroll.y = text_box->cursor_info.pos.visual_y;
 
@@ -1186,9 +1189,10 @@ static inline STATUS_GET_LAST_LINE get_end_last_displayed_visual_line_from_curso
             &curr_pos,
             max_visual_width
         )) {
-            curr_pos.cursor = text_box->string.count - 1;
+            curr_pos.cursor = (text_box->string.count > 1) ? (text_box->string.count - 1) : 0;
             *end_last_displayed_line = curr_pos.cursor;
             *count_lines_actually_displayed = idx;
+            debug("last line end buffer thing");
             return STATUS_LAST_LINE_END_BUFFER;
         }
 
@@ -1200,6 +1204,7 @@ static inline STATUS_GET_LAST_LINE get_end_last_displayed_visual_line_from_curso
     
     *end_last_displayed_line = curr_pos.cursor - 1;
     *count_lines_actually_displayed = max_visual_height;
+    debug("last line success normal thing");
     return STATUS_LAST_LINE_SUCCESS;
 }
 

@@ -24,13 +24,16 @@ static const char* QUIT_CONFIRM_TEXT = "Are you sure that you want to exit witho
 
 static FILE* log_file;
 
-#define INFO_HEIGHT 4
+#define GENERAL_INFO_HEIGHT    1
+#define SAVE_INFO_HEIGHT       1
+#define SEARCH_QUERY_HEIGHT    1
+#define INFO_HEIGHT            (GENERAL_INFO_HEIGHT + SAVE_INFO_HEIGHT + SEARCH_QUERY_HEIGHT)
 
-#define ctrl(x)           ((x) & 0x1f)
+#define ctrl(x)     ((x) & 0x1f)
 
 #define todo(...) do {assert(false && "not implemented:" && __VA_ARGS__);} while(0)
 
-#define LOG_EVERYTHING 1
+//#define LOG_EVERYTHING 1
 #ifdef LOG_EVERYTHING
 #define debug(...) do { \
         fprintf(log_file, "file:%s:%d:", __FILE__, __LINE__); \
@@ -54,7 +57,7 @@ typedef enum {SEARCH_DIR_FORWARDS, SEARCH_DIR_BACKWARDS} SEARCH_DIR;
 static void* safe_malloc(size_t s) {
     void* ptr = malloc(s);
     if (!ptr) {
-        log("fetal error: could not allocate memory\n");
+        log("fetal error: malloc failed\n");
         abort();
     }
     return ptr;
@@ -63,7 +66,7 @@ static void* safe_malloc(size_t s) {
 static void* safe_realloc(void* buf, size_t s) {
     buf = realloc(buf, s);
     if (!buf) {
-        log("fetal error: could not allocate memory\n");
+        log("fetal error: realloc failed\n");
         abort();
     }
     return buf;
