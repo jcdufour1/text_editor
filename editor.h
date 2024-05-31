@@ -138,7 +138,6 @@ static inline Editor* Editor_get() {
     return editor;
 }
 
-
 static inline void Text_win_free(Text_win* window) {
     Text_box_free(&window->text_box);
     delwin(window->window);

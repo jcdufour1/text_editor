@@ -98,28 +98,28 @@ static inline void highlight_text_in_vis_area(WINDOW* window, const Text_box* ma
     // highlight area between cursor position (exclusive) and visual_end (inclusive)
     Cursor_info_cpy(curr_visual, &main_box->cursor_info);
     while (curr_visual->pos.cursor < vis_end && curr_visual->pos.cursor < end_last_displayed_line) {
-    debug("highlight thing 2: y: %zu; x: %zu", curr_visual->pos.visual_y, curr_visual->pos.visual_x);
-    mvwchgat(
-        window,
-        Cursor_info_get_cursor_screen_y(curr_visual),
-        Cursor_info_get_cursor_screen_x(curr_visual),
-        1,
-        A_REVERSE,
-        0,
-        NULL
-    );
+        debug("highlight thing 2: y: %zu; x: %zu", curr_visual->pos.visual_y, curr_visual->pos.visual_x);
+        mvwchgat(
+            window,
+            Cursor_info_get_cursor_screen_y(curr_visual),
+            Cursor_info_get_cursor_screen_x(curr_visual),
+            1,
+            A_REVERSE,
+            0,
+            NULL
+        );
 
-    CUR_ADVANCE_STATUS status = Pos_data_advance_one(&curr_visual->pos, &main_box->string, window_width, true);
-    switch (status) {
-    case CUR_ADV_AT_START_NEXT_LINE: // fallthrough
-    case CUR_ADV_NORMAL:
-        break;
-    case CUR_ADV_PAST_END_BUFFER: //fallthrough
-    case CUR_ADV_ERROR: 
-        log("fetal error");
-        abort();
-        break;
-    }
+        CUR_ADVANCE_STATUS status = Pos_data_advance_one(&curr_visual->pos, &main_box->string, window_width, true);
+        switch (status) {
+        case CUR_ADV_AT_START_NEXT_LINE: // fallthrough
+        case CUR_ADV_NORMAL:
+            break;
+        case CUR_ADV_PAST_END_BUFFER: //fallthrough
+        case CUR_ADV_ERROR: 
+            log("fetal error");
+            abort();
+            break;
+        }
     }
     mvwchgat(
         window,
@@ -593,7 +593,10 @@ int main(int argc, char** argv) {
     //set_escdelay(100);
     parse_args(editor, argc, argv);
 
-    initscr();
+    if (!initscr()) {
+        log("fetal error: initscr failed");
+        abort();
+    }
 	keypad(stdscr, TRUE); // We get F1, F2 etc..
     //cbreak();
     raw();	    // Line buffering disabled
