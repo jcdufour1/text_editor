@@ -31,7 +31,7 @@ static FILE* log_file;
 
 #define ctrl(x)     ((x) & 0x1f)
 
-#define todo(...) do {assert(false && "not implemented:" && __VA_ARGS__);} while(0)
+#define todo(...) do {assert(false && "not implemented:" && __VA_ARGS__); abort();} while(0)
 
 //#define LOG_EVERYTHING 1
 #ifdef LOG_EVERYTHING

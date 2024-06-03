@@ -1062,7 +1062,6 @@ static inline bool Text_box_del_substr(Text_box* text_box, size_t index_start, s
     size_t idx_end = index_start + (count_to_del - 1);
 
     for (size_t idx = 0; idx < count_to_del; idx++) {
-        debug("Text_box_del_substr: idx_end: %zu; count_to_del: %zu; index_start: %zu", idx_end, count_to_del, index_start);
         if (!String_del(&text_box->string, idx_end)) {
             return false;
         }

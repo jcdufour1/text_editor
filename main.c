@@ -12,7 +12,6 @@
 #include "text_box.h"
 
 // TODO: rope?
-// TODO: some edge cases with scrolling feeling strange (ie. at bottom of file)
 // TODO: copy/paste to/from system clipboard
 // TODO: set info text to say "copied", etc. when copying
 // TODO: utf-8
@@ -24,7 +23,6 @@
 // TODO: improve undo/redo
 // 
 // TODO: complete support for /n/r line ending 
-// TODO: Windows support
 
 // TODO: make way to pipe text into grep and jump to result, similar to :grep in vim
 
@@ -522,7 +520,6 @@ void test_Text_box_get_index_scroll_offset(void) {
     test_template_Text_box_get_index_scroll_offset("hello\nworld\n", 1, 6);
 
     test_template_Text_box_get_index_scroll_offset("hello\n\nworld\n", 0, 0);
-    debug("ejflkajeflk");
     test_template_Text_box_get_index_scroll_offset("hello\n\nworld\n", 1, 6);
     test_template_Text_box_get_index_scroll_offset("hello\n\nworld\n", 2, 7);
 
@@ -649,7 +646,6 @@ int main(int argc, char** argv) {
         debug("draw cursor");
 
         // get and process next keystroke
-        //debug("BEFORE process_next_input; visual_x: %zu; visual_y: %zu", editor->file_text.visual_x, editor->file_text.visual_y);
         process_next_input(&should_resize_window, editor, &should_close);
         debug("AFTER process_next_input; visual_x: %zu; visual_y: %zu; cursor: %zu; scroll_y: %zu, char at cursor: %c",
             editor->file_text.text_box.cursor_info.pos.visual_x,
