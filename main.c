@@ -273,10 +273,18 @@ static void process_next_input(bool* should_resize_window, Editor* editor, bool*
             }
         } break;
         case KEY_ENTER: {
-            Editor_insert_into_main_file_text(editor, '\n', main_box->cursor_info.pos.cursor, editor->file_text.width, editor->file_text.height);
+            String new_str;
+            String_init(&new_str);
+            String_append(&new_str, '\n');
+            Editor_insert_into_main_file_text(editor, &new_str, main_box->cursor_info.pos.cursor, editor->file_text.width, editor->file_text.height);
+            String_free_char_data(&new_str);
         } break;
         default: {
-            Editor_insert_into_main_file_text(editor, new_ch, main_box->cursor_info.pos.cursor, editor->file_text.width, editor->file_text.height);
+            String new_str;
+            String_init(&new_str);
+            String_append(&new_str, new_ch);
+            Editor_insert_into_main_file_text(editor, &new_str, main_box->cursor_info.pos.cursor, editor->file_text.width, editor->file_text.height);
+            String_free_char_data(&new_str);
         } break;
     } break;
     }
@@ -313,7 +321,7 @@ static void process_next_input(bool* should_resize_window, Editor* editor, bool*
         } break;
         case KEY_BACKSPACE: {
             if (editor->search_query.text_box.cursor_info.pos.cursor > 0) {
-                Text_box_del(&editor->search_query.text_box, editor->search_query.text_box.cursor_info.pos.cursor - 1, editor->file_text.width, editor->file_text.height);
+                Text_box_del_ch(&editor->search_query.text_box, editor->search_query.text_box.cursor_info.pos.cursor - 1, editor->file_text.width, editor->file_text.height);
             }
         } break;
         case ctrl('n'): // fallthrough
@@ -378,7 +386,7 @@ static void process_next_input(bool* should_resize_window, Editor* editor, bool*
             }
         } break;
         default: {
-            Text_box_insert(&editor->search_query.text_box, new_ch, editor->search_query.text_box.cursor_info.pos.cursor, editor->file_text.width, editor->file_text.height);
+            Text_box_insert_ch(&editor->search_query.text_box, new_ch, editor->search_query.text_box.cursor_info.pos.cursor, editor->file_text.width, editor->file_text.height);
         } break;
         }
     } break;

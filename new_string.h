@@ -62,6 +62,10 @@ static inline void String_cpy_from_substring(String* dest, const String* src, si
     
 }
 
+static inline void String_cpy(String* dest, const String* src) {
+    String_cpy_from_substring(dest, src, 0, src->count);
+}
+
 static inline void String_append(String* string, char new_ch) {
     vector_append_char(string, &new_ch);
 }
@@ -90,6 +94,7 @@ static inline void String_get_curr_line(char* buf, const String* string, size_t 
 */
 
 static inline char String_at(const String* string, size_t index) {
+    assert(index < string->count && "out of bounds");
     return string->items[index];
 }
 

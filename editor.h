@@ -159,15 +159,26 @@ static void Editor_undo(Editor* editor, size_t max_visual_width, size_t max_visu
     Action action_to_undo;
     Actions_pop(&action_to_undo, &editor->actions);
 
+    debug("Editor_undo: cursor: %zu", action_to_undo.cursor);
     switch (action_to_undo.action) {
-    case ACTION_INSERT_CH: {
-        Text_box_del(&editor->file_text.text_box, action_to_undo.cursor, max_visual_width, max_visual_height);
-        Action undo_action = {.cursor = action_to_undo.cursor, .action = ACTION_BACKSPACE_CH, .ch = action_to_undo.ch};
+    case ACTION_INSERT_STRING: {
+        Text_box_del_substr(
+            &editor->file_text.text_box,
+            action_to_undo.cursor,
+            action_to_undo.str.count
+        );
+        Action undo_action = {.cursor = action_to_undo.cursor, .action = ACTION_REMOVE_STRING, .str = action_to_undo.str};
         Actions_append(&editor->undo_actions, &undo_action);
         } break;
-    case ACTION_BACKSPACE_CH: {
-        Text_box_insert(&editor->file_text.text_box, action_to_undo.ch, action_to_undo.cursor, max_visual_width, max_visual_height);
-        Action undo_action = {.cursor = action_to_undo.cursor, .action = ACTION_INSERT_CH, .ch = action_to_undo.ch};
+    case ACTION_REMOVE_STRING: {
+        Text_box_insert_substr(
+            &editor->file_text.text_box,
+            &action_to_undo.str,
+            action_to_undo.cursor,
+            max_visual_width,
+            max_visual_height
+        );
+        Action undo_action = {.cursor = action_to_undo.cursor, .action = ACTION_INSERT_STRING, .str = action_to_undo.str};
         Actions_append(&editor->undo_actions, &undo_action);
         } break;
     default:
@@ -183,14 +194,16 @@ static void Editor_redo(Editor* editor, size_t max_visual_width, size_t max_visu
     Actions_pop(&action_to_redo, &editor->undo_actions);
 
     switch (action_to_redo.action) {
-    case ACTION_INSERT_CH: {
-        Text_box_del(&editor->file_text.text_box, action_to_redo.cursor, max_visual_width, max_visual_height);
-        Action redo_action = {.cursor = action_to_redo.cursor, .action = ACTION_BACKSPACE_CH, .ch = action_to_redo.ch};
+    case ACTION_INSERT_STRING: {
+        Text_box_del_substr(&editor->file_text.text_box, action_to_redo.cursor, action_to_redo.str.count);
+        Action redo_action = {.cursor = action_to_redo.cursor, .action = ACTION_REMOVE_STRING, .str = {0}};
+        String_cpy(&redo_action.str, &action_to_redo.str);
         Actions_append(&editor->actions, &redo_action);
         } break;
-    case ACTION_BACKSPACE_CH: {
-        Text_box_insert(&editor->file_text.text_box, action_to_redo.ch, action_to_redo.cursor, max_visual_width, max_visual_height);
-        Action redo_action = {.cursor = action_to_redo.cursor, .action = ACTION_INSERT_CH, .ch = action_to_redo.ch};
+    case ACTION_REMOVE_STRING: {
+        Text_box_insert_substr(&editor->file_text.text_box, &action_to_redo.str, action_to_redo.cursor, max_visual_width, max_visual_height);
+        Action redo_action = {.cursor = action_to_redo.cursor, .action = ACTION_INSERT_STRING, .str = {0}};
+        String_cpy(&redo_action.str, &action_to_redo.str);
         Actions_append(&editor->actions, &redo_action);
         } break;
     default:
@@ -251,17 +264,29 @@ static void Editor_cpy_selection(Editor* editor) {
 }
 
 static void Editor_paste_selection(Editor* editor) {
-    //fprintf(stderr, "Editor_paste_selection: clipboard: \"%.*s\"\n", (int)editor->clipboard.count, editor->clipboard.str);
+    // insert text
     String_insert_string(&editor->file_text.text_box.string, editor->file_text.text_box.cursor_info.pos.cursor, &editor->clipboard);
+
+    // add action to actions so that insertion can be undone
+    Action new_action = {
+        .cursor = editor->file_text.text_box.cursor_info.pos.cursor,
+        .action = ACTION_INSERT_STRING,
+        .str = {0}
+    };
+    String_cpy(&new_action.str, &editor->clipboard);
+    Actions_append(&editor->actions, &new_action);
 }
 
-static void Editor_insert_into_main_file_text(Editor* editor, int new_ch, size_t index, size_t max_visual_width, size_t max_visual_height) {
+static void Editor_insert_into_main_file_text(Editor* editor, const String* new_str, size_t index, size_t max_visual_width, size_t max_visual_height) {
     if (!editor->unsaved_changes) {
         String_cpy_from_cstr(&editor->save_info.text_box.string, UNSAVED_CHANGES_TEXT, strlen(UNSAVED_CHANGES_TEXT));
         editor->unsaved_changes = true;
     }
-    Action new_action = {.cursor = editor->file_text.text_box.cursor_info.pos.cursor, .action = ACTION_INSERT_CH, .ch = new_ch};
-    Text_box_insert(&editor->file_text.text_box, new_ch, index, max_visual_width, max_visual_height);
+
+    Text_box_insert_substr(&editor->file_text.text_box, new_str, index, max_visual_width, max_visual_height);
+
+    Action new_action = {.cursor = editor->file_text.text_box.cursor_info.pos.cursor - 1, .action = ACTION_INSERT_STRING, .str = {0}};
+    String_cpy(&new_action.str, new_str);
     Actions_append(&editor->actions, &new_action);
     editor->unsaved_changes = true;
 
@@ -280,10 +305,19 @@ static void Editor_insert_into_main_file_text(Editor* editor, int new_ch, size_t
 }
 
 static void Editor_del_main_file_text(Editor* editor, size_t max_visual_width, size_t max_visual_height) {
-    int ch_to_del = String_at(&editor->file_text.text_box.string, editor->file_text.text_box.cursor_info.pos.cursor - 1);
-    Action new_action = {.cursor = editor->file_text.text_box.cursor_info.pos.cursor - 1, .action = ACTION_BACKSPACE_CH, .ch = ch_to_del};
+    Action new_action = {
+        .cursor = editor->file_text.text_box.cursor_info.pos.cursor - 1,
+        .action = ACTION_REMOVE_STRING,
+        .str = {0}
+    };
+
+    // placing char to delete in new_action->str
+    String_init(&new_action.str);
+    String_append(&new_action.str, String_at(&editor->file_text.text_box.string, editor->file_text.text_box.cursor_info.pos.cursor - 1));
+
     Actions_append(&editor->actions, &new_action);
-    bool del_success = Text_box_del(&editor->file_text.text_box, editor->file_text.text_box.cursor_info.pos.cursor - 1, max_visual_width, max_visual_height);
+
+    bool del_success = Text_box_del_ch(&editor->file_text.text_box, editor->file_text.text_box.cursor_info.pos.cursor - 1, max_visual_width, max_visual_height);
     if (del_success && !editor->unsaved_changes) {
         String_cpy_from_cstr(&editor->save_info.text_box.string, UNSAVED_CHANGES_TEXT, strlen(UNSAVED_CHANGES_TEXT));
         editor->unsaved_changes = true;

@@ -1,6 +1,7 @@
 #ifndef TEXT_BOX_H
 #define TEXT_BOX_H
 
+#include "str_view.h"
 #include "util.h"
 #include "new_string.h"
 
@@ -136,17 +137,17 @@ static inline CUR_ADVANCE_STATUS Pos_data_advance_one(
 
 
         // get to start of the next visual line
+        curr_pos->cursor++;
         if (curr_pos->cursor >= string->count) {
             // no more lines are remaining
             return CUR_ADV_PAST_END_BUFFER;
         }
-        curr_pos->cursor++;
         if (String_at(string, curr_pos->cursor) == '\r') {
+            curr_pos->cursor++;
             if (curr_pos->cursor >= string->count) {
                 // no more lines are remaining
                 return CUR_ADV_PAST_END_BUFFER;
             }
-            curr_pos->cursor++;
         }
 
         if (is_visual) {
@@ -1041,7 +1042,7 @@ static inline void Text_box_move_cursor(
     }
 }
 
-static inline bool Text_box_del(Text_box* text_box, size_t index, size_t max_visual_width, size_t max_visual_height) {
+static inline bool Text_box_del_ch(Text_box* text_box, size_t index, size_t max_visual_width, size_t max_visual_height) {
     if (text_box->string.count < 1) {
         return false;
     }
@@ -1052,14 +1053,42 @@ static inline bool Text_box_del(Text_box* text_box, size_t index, size_t max_vis
     return String_del(&text_box->string, index);
 }
 
-static inline void Text_box_insert(Text_box* text_box, int new_ch, size_t index, size_t max_visual_width, size_t max_visual_height) {
+static inline bool Text_box_del_substr(Text_box* text_box, size_t index_start, size_t count_to_del) {
+    if (text_box->string.count < 1) {
+        return false;
+    }
+
+    assert(count_to_del > 0);
+    size_t idx_end = index_start + (count_to_del - 1);
+
+    for (size_t idx = 0; idx < count_to_del; idx++) {
+        debug("Text_box_del_substr: idx_end: %zu; count_to_del: %zu; index_start: %zu", idx_end, count_to_del, index_start);
+        if (!String_del(&text_box->string, idx_end)) {
+            return false;
+        }
+        idx_end--;
+    }
+
+    return true;
+}
+
+static inline void Text_box_insert_ch(Text_box* text_box, int new_ch, size_t index, size_t max_visual_width, size_t max_visual_height) {
     assert(index <= text_box->string.count && "out of bounds");
     String_insert(&text_box->string, new_ch, index);
     Text_box_move_cursor(text_box, DIR_RIGHT, max_visual_width, max_visual_height, false);
 }
 
 static inline void Text_box_append(Text_box* text, int new_ch, size_t max_visual_width, size_t max_visual_height) {
-    Text_box_insert(text, new_ch, text->string.count, max_visual_width, max_visual_height);
+    Text_box_insert_ch(text, new_ch, text->string.count, max_visual_width, max_visual_height);
+}
+
+static inline void Text_box_insert_substr(Text_box* text_box, const String* new_str, size_t index_start, size_t max_visual_width, size_t max_visual_height) {
+    for (size_t idx = new_str->count - 1; idx > 0; idx--) {
+        debug("YES YES thing");
+        Text_box_insert_ch(text_box, String_at(new_str, idx), index_start, max_visual_width, max_visual_height);
+    }
+    debug("YES YES thing bottom");
+    Text_box_insert_ch(text_box, String_at(new_str, 0), index_start, max_visual_width, max_visual_height);
 }
 
 static inline bool Text_box_perform_search_internal(
