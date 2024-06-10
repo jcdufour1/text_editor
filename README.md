@@ -1,6 +1,6 @@
 # New Text Editor
 
-This is a text editor, written in c.
+This is a text editor for unix-like systems, written in c.
 
 ## build
 ### dependencies
@@ -8,11 +8,11 @@ This is a text editor, written in c.
 
 ### release build
 ```
-$ ./build_release.sh
+$ make build_release
 ```
 ### debug build
 ```
-$ ./build.sh
+$ make
 ```
 
 ## how to use
