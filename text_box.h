@@ -116,6 +116,7 @@ typedef enum {
     CUR_ADV_ERROR
 } CUR_ADVANCE_STATUS;
 
+// this function will not modify curr_pos if it returns CUR_ADV_PAST_END_BUFFER
 static inline CUR_ADVANCE_STATUS Pos_data_advance_one(
     Pos_data* curr_pos,
     const String* string,
@@ -140,12 +141,18 @@ static inline CUR_ADVANCE_STATUS Pos_data_advance_one(
         curr_pos->cursor++;
         if (curr_pos->cursor >= string->count) {
             // no more lines are remaining
+
+            // decrement cursor, so that the cursor state will be unchanged from when the function was called
+            curr_pos->cursor--;
             return CUR_ADV_PAST_END_BUFFER;
         }
         if (String_at(string, curr_pos->cursor) == '\r') {
             curr_pos->cursor++;
             if (curr_pos->cursor >= string->count) {
                 // no more lines are remaining
+
+                // decrement cursor twice, so that the cursor state will be unchanged from when the function was called
+                curr_pos->cursor -= 2;
                 return CUR_ADV_PAST_END_BUFFER;
             }
         }
@@ -731,7 +738,7 @@ static inline void Text_box_recalculate_visual_xy_and_scroll_offset(Text_box* te
     text_box->cursor_info.scroll.offset = new_scroll_offset;
 }
 
-static inline void Cursor_info_scroll_screen_down_one(Cursor_info* cursor_info, const String* string, size_t max_visual_width, size_t max_visual_height) {
+static inline void Scroll_data_scroll_screen_down_one(Scroll_data* scroll, const Pos_data* pos, const String* string, size_t max_visual_width, size_t max_visual_height) {
 
     /*
     debug(
@@ -743,13 +750,13 @@ static inline void Cursor_info_scroll_screen_down_one(Cursor_info* cursor_info, 
         text_box->scroll_y
     );
     */
-    if (Cursor_info_get_cursor_screen_y(cursor_info) < max_visual_height - 1) {
+    if (pos->visual_y - scroll->y < max_visual_height - 1) {
         // do not scroll screen
         //debug("DIR_DOWN_NO: cursor_screen_y: %zu; max_visual_height: %zu", text_box->cursor_screen_y, max_visual_height);
     } else {
         // scroll screen
-        cursor_info->scroll.y++; // scroll screen one line
-        Pos_data init_pos_scroll_offset = {.cursor = cursor_info->scroll.offset, .visual_x = 0, .visual_y = 0};
+        scroll->y++; // scroll screen one line
+        Pos_data init_pos_scroll_offset = {.cursor = scroll->offset, .visual_x = 0, .visual_y = 0};
         Pos_data new_scroll_offset;
         //debug("DIR_DOWN_YES");
         if (!get_start_next_visual_line_from_curr_cursor_x(
@@ -760,12 +767,11 @@ static inline void Cursor_info_scroll_screen_down_one(Cursor_info* cursor_info, 
         )) {
             abort();
         };
-        cursor_info->scroll.offset = new_scroll_offset.cursor;
+        scroll->offset = new_scroll_offset.cursor;
     }
 }
 
-static inline void Cursor_info_scroll_screen_up_one(Scroll_data* scroll, const Pos_data* pos, const String* string, size_t max_visual_width) {
-
+static inline void Scroll_data_scroll_screen_up_one(Scroll_data* scroll, const Pos_data* pos, const String* string, size_t max_visual_width) {
     if (pos->visual_y >= scroll->y) {
         // do not scroll screen
         //debug("DIR_UP_NO: max_visual_height: %zu", max_visual_height);
@@ -791,7 +797,7 @@ static inline void Cursor_info_move_cursor_right(Cursor_info* cursor_info, const
     CUR_ADVANCE_STATUS status = Pos_data_advance_one(&cursor_info->pos, string, max_visual_width, true);
     switch (status) {
     case CUR_ADV_AT_START_NEXT_LINE:
-        Cursor_info_scroll_screen_down_one(cursor_info, string, max_visual_width, max_visual_height);
+        Scroll_data_scroll_screen_down_one(&cursor_info->scroll, &cursor_info->pos, string, max_visual_width, max_visual_height);
         // fallthrough
     case CUR_ADV_NORMAL:
         cursor_info->scroll.user_max_col = cursor_info->pos.visual_x;
@@ -815,25 +821,61 @@ static inline void Cursor_info_move_cursor_right(Cursor_info* cursor_info, const
     }
 }
 
+static inline void Cursor_info_move_cursor_to_end_of_file(
+    Cursor_info* cursor_info,
+    const String* string,
+    size_t max_visual_width,
+    size_t max_visual_height
+) {
+    while (1) {
+        CUR_ADVANCE_STATUS status = Pos_data_advance_one(
+            &cursor_info->pos,
+            string,
+            max_visual_width,
+            true
+        );
 
-static inline void Cursor_info_move_cursor_left(Cursor_info* cursor_info, const String* string, size_t max_visual_width, bool wrap) {
+        switch (status) {
+        case CUR_ADV_AT_START_NEXT_LINE:
+            Scroll_data_scroll_screen_down_one(&cursor_info->scroll, &cursor_info->pos, string, max_visual_width, max_visual_height);
+            // fallthrough
+        case CUR_ADV_NORMAL:
+            break;
+        case CUR_ADV_PAST_END_BUFFER:
+            // cursor is now at the end of the file effectively
+            return;
+        case CUR_ADV_ERROR:
+            log("fetal error: unreachable");
+            abort();
+        }
+    }
+}
+
+static inline void Cursor_info_move_cursor_left(
+    Cursor_info* cursor_info,
+    const String* string,
+    size_t max_visual_width,
+    size_t max_visual_height,
+    bool wrap
+) {
     CUR_DECRE_STATUS status = Pos_data_decrement_one(&cursor_info->pos, string, max_visual_width, true);
     switch (status) {
     case CUR_DEC_MOVED_TO_PREV_LINE:
-        Cursor_info_scroll_screen_up_one(&cursor_info->scroll, &cursor_info->pos, string, max_visual_width);
+        Scroll_data_scroll_screen_up_one(&cursor_info->scroll, &cursor_info->pos, string, max_visual_width);
         assert(cursor_info->scroll.x == 0 && "not implemented");
         // fallthrough
     case CUR_DEC_NORMAL:
+        // fallthrough
     case CUR_DEC_AT_START_BUFFER:
+        // fallthrough
     case CUR_DEC_AT_START_CURR_LINE:
         cursor_info->scroll.user_max_col = cursor_info->pos.visual_x;
         return;
     case CUR_DEC_ALREADY_AT_START_BUFFER:
-        if (wrap) {
-            // move cursor to the end of the file
-            todo("");
-            abort();
+        if (!wrap) {
+            return;
         }
+        Cursor_info_move_cursor_to_end_of_file(cursor_info, string, max_visual_width, max_visual_height);
         return;
     default:
         log("fetal error");
@@ -841,7 +883,12 @@ static inline void Cursor_info_move_cursor_left(Cursor_info* cursor_info, const 
     }
 }
 
-static inline void Cursor_info_move_cursor_up(Cursor_info* cursor_info, const String* string, size_t max_visual_width) {
+static inline void Cursor_info_move_cursor_up(
+    Cursor_info* cursor_info,
+    const String* string,
+    size_t max_visual_width,
+    size_t max_visual_height
+) {
     debug(
         "UP before: Text_box_get_cursor_screen_y(text_box): %zu; text_box->visual_x: %zu; text_box->visual_y: %zu; scroll_offset: %zu; scroll_y: %zu, char at scroll_offset: %x",
         Cursor_info_get_cursor_screen_y(cursor_info),
@@ -859,7 +906,7 @@ static inline void Cursor_info_move_cursor_up(Cursor_info* cursor_info, const St
     }
 
     if (cursor_info->pos.cursor == string->count) {
-        Cursor_info_move_cursor_left(cursor_info, string, max_visual_width, false);
+        Cursor_info_move_cursor_left(cursor_info, string, max_visual_width, max_visual_height, false);
         return;
     }
 
@@ -979,7 +1026,7 @@ static inline void Cursor_info_move_cursor_down(Cursor_info* cursor_info, const 
         text_box->scroll_y
     );
     */
-    Cursor_info_scroll_screen_down_one(cursor_info, string, max_visual_width, max_visual_height);
+    Scroll_data_scroll_screen_down_one(&cursor_info->scroll, &cursor_info->pos, string, max_visual_width, max_visual_height);
     cursor_info->pos.visual_x = MIN(len_next_line - 1, cursor_info->scroll.user_max_col);
     cursor_info->pos.visual_y++;
     cursor_info->pos.cursor = start_next_line.cursor + cursor_info->pos.visual_x;
@@ -1012,6 +1059,7 @@ static inline void Text_box_move_cursor(
             &text_box->cursor_info,
             &text_box->string,
             max_visual_width,
+            max_visual_height,
             wrap
         );
         break;
@@ -1028,7 +1076,8 @@ static inline void Text_box_move_cursor(
         Cursor_info_move_cursor_up(
             &text_box->cursor_info,
             &text_box->string,
-            max_visual_width
+            max_visual_width,
+            max_visual_height
         );
         break;
     case DIR_DOWN:
@@ -1090,67 +1139,72 @@ static inline void Text_box_insert_substr(Text_box* text_box, const String* new_
     Text_box_insert_ch(text_box, String_at(new_str, 0), index_start, max_visual_width, max_visual_height);
 }
 
-static inline bool Text_box_perform_search_internal(
-    size_t* result,
-    const Text_box* text_box_to_search,
-    const String* query,
-    SEARCH_DIR search_direction
+// returns true if substring equals needle
+static inline bool String_substring_equals_string(
+    const String* haystack,
+    size_t haystack_start,
+    size_t haystack_size,
+    const String* needle
 ) {
-    // search result put in text_box_to_search->cursor
-
-    if (query->count < 1) {
-        assert(false && "not implemented");
+    for (size_t offset = 0; offset < haystack_size; offset++) {
+        size_t haystack_idx = haystack_start + offset;
+        if (String_at(haystack, haystack_idx) != String_at(needle, offset)) {
+            return false;
+        }
     }
+    return true;
+}
 
-    const String* text_to_search = &text_box_to_search->string;
-
+// text box should be unchanged in this function if this function returns false
+// text box should be unchanged in this function (except for cursor related info) if this function returns true
+static inline bool Text_box_perform_search_internal(
+    Text_box* text_box_to_search,
+    const String* query,
+    SEARCH_DIR search_direction,
+    int max_visual_width,
+    int max_visual_height
+) {
     switch (search_direction) {
     case SEARCH_DIR_FORWARDS: {
         for (size_t search_offset = 0; search_offset < text_box_to_search->string.count; search_offset++) {
-            size_t idx_to_search = (text_box_to_search->cursor_info.pos.cursor + search_offset) % text_box_to_search->string.count;
-
-            if (idx_to_search + query->count > text_box_to_search->string.count) {
-                continue;
-            };
-
-            bool string_at_idx = true;
-
-            debug("char at idx_to_search: %c; idx_to_search: %zu", String_at(text_to_search, idx_to_search), idx_to_search);
-            for (size_t query_idx = 0; query_idx < query->count; query_idx++) {
-                if (String_at(text_to_search, idx_to_search + query_idx) != String_at(query, query_idx)) {
-                    string_at_idx = false;
-                    break;
-                }
-            }
-
-            if (string_at_idx) {
-                *result = idx_to_search;
+            if (String_substring_equals_string(
+                &text_box_to_search->string,
+                text_box_to_search->cursor_info.pos.cursor,
+                query->count,
+                query
+            )) {
+                // result found
                 return true;
             }
+
+            Cursor_info_move_cursor_right(
+                &text_box_to_search->cursor_info,
+                &text_box_to_search->string,
+                max_visual_width,
+                max_visual_height,
+                true
+            );
         }
     } break;
     case SEARCH_DIR_BACKWARDS: {
         for (int64_t search_offset = text_box_to_search->string.count - 1; search_offset >= 0; search_offset--) {
-            int64_t idx_to_search = (text_box_to_search->cursor_info.pos.cursor + search_offset) % text_box_to_search->string.count;
-
-            if (idx_to_search + 1 < (int64_t)query->count) {
-                continue;
-            };
-
-            bool string_at_idx = true;
-
-            for (int64_t query_idx = query->count - 1; query_idx >= 0; query_idx--) {
-                assert((idx_to_search + query_idx) - (int64_t)query->count >= 0);
-                if (String_at(text_to_search, (idx_to_search + query_idx) - query->count) != String_at(query, query_idx)) {
-                    string_at_idx = false;
-                    break;
-                }
-            }
-
-            if (string_at_idx) {
-                *result = idx_to_search - query->count;
+            if (String_substring_equals_string(
+                &text_box_to_search->string,
+                text_box_to_search->cursor_info.pos.cursor,
+                query->count,
+                query
+            )) {
+                // result found
                 return true;
             }
+
+            Cursor_info_move_cursor_left(
+                &text_box_to_search->cursor_info,
+                &text_box_to_search->string,
+                max_visual_width,
+                max_visual_height,
+                true
+            );
         }
     } break;
     default:
@@ -1158,6 +1212,7 @@ static inline bool Text_box_perform_search_internal(
         abort();
     }
 
+    // search did not find any results
     return false;
 }
 
@@ -1165,16 +1220,17 @@ static inline bool Text_box_do_search(
     Text_box* text_box_to_search,
     const String* query,
     SEARCH_DIR search_direction,
-    size_t max_visual_width
+    size_t max_visual_width,
+    size_t max_visual_height
 ) {
-    size_t result;
-    if (!Text_box_perform_search_internal(&result, text_box_to_search, query, search_direction)) {
+    //size_t result;
+    if (!Text_box_perform_search_internal(text_box_to_search, query, search_direction, max_visual_width, max_visual_height)) {
         return false;
     }
 
-    debug("result: %zu; query: %s", result, query->items);
-    text_box_to_search->cursor_info.pos.cursor = result;
-    Text_box_recalculate_visual_xy_and_scroll_offset(text_box_to_search, max_visual_width);
+    //debug("result: %zu; query: %s", result, query->items);
+    //text_box_to_search->cursor_info.pos.cursor = result;
+    //Text_box_recalculate_visual_xy_and_scroll_offset(text_box_to_search, max_visual_width);
 
     return true;
 }

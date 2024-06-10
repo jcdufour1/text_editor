@@ -342,7 +342,8 @@ static void process_next_input(bool* should_resize_window, Editor* editor, bool*
                 main_box,
                 &search_box->string,
                 SEARCH_DIR_FORWARDS,
-                editor->file_text.width
+                editor->file_text.width,
+                editor->file_text.height
             )) {
                 debug("search yes");
                 editor->search_status = SEARCH_REPEAT;
@@ -360,12 +361,7 @@ static void process_next_input(bool* should_resize_window, Editor* editor, bool*
             case SEARCH_FIRST:
                 break;
             case SEARCH_REPEAT:
-                if (main_box->cursor_info.pos.cursor == 0) {
-                    main_box->cursor_info.pos.cursor = main_box->string.count - 1;
-                } else {
-                    main_box->cursor_info.pos.cursor--;
-                    main_box->cursor_info.pos.cursor %= main_box->string.count;
-                }
+                Text_box_move_cursor(main_box, DIR_LEFT, editor->file_text.width, editor->file_text.height, true);
                 break;
             default:
                 assert(false && "unreachable");
@@ -375,7 +371,8 @@ static void process_next_input(bool* should_resize_window, Editor* editor, bool*
                     main_box,
                     &editor->search_query.text_box.string,
                     SEARCH_DIR_BACKWARDS,
-                    editor->file_text.width
+                    editor->file_text.width,
+                    editor->file_text.height
                 )) {
                 editor->search_status = SEARCH_REPEAT;
                 String_cpy_from_cstr(&editor->general_info.text_box.string, SEARCH_TEXT, strlen(SEARCH_TEXT));
