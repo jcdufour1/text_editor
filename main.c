@@ -36,7 +36,21 @@ static void draw_cursor(WINDOW* window, const Text_box* text_box) {
     wmove(window, screen_y, screen_x);
 }
 
-static inline void highlight_text_in_area(WINDOW* window, const Text_box* main_box, size_t vis_start, size_t vis_end, size_t scroll_offset, size_t window_width, size_t end_last_displayed_line) {
+static inline void highlight_text_in_area(
+    WINDOW* window,
+    const Text_box* main_box,
+    size_t vis_start,
+    size_t vis_end,
+    size_t scroll_offset,
+    size_t window_width,
+    size_t end_last_displayed_line,
+    MISC_INFO misc_info
+) {
+    if (misc_info & MISC_HAS_COLOR) {
+        attron(COLOR_PAIR(SEARCH_RESULT_PAIR));
+    }
+    //mvaddch(y, x, PLAYER);
+
     debug(
         "VISUAL_PRINTING_THING: visual_sel_start: %zu; visual_sel_end: %zu; cursor: %zu; scroll_offset: %zu",
         vis_start,
@@ -60,8 +74,8 @@ static inline void highlight_text_in_area(WINDOW* window, const Text_box* main_b
             Cursor_info_get_cursor_screen_y(curr_visual),
             Cursor_info_get_cursor_screen_x(curr_visual),
             1,
-            A_REVERSE,
             0,
+            SEARCH_RESULT_PAIR,
             NULL
         );
 
@@ -86,8 +100,8 @@ static inline void highlight_text_in_area(WINDOW* window, const Text_box* main_b
         Cursor_info_get_cursor_screen_y(curr_visual),
         Cursor_info_get_cursor_screen_x(curr_visual),
         1,
-        A_REVERSE,
         0,
+        SEARCH_RESULT_PAIR,
         NULL
     );
 
@@ -100,8 +114,8 @@ static inline void highlight_text_in_area(WINDOW* window, const Text_box* main_b
             Cursor_info_get_cursor_screen_y(curr_visual),
             Cursor_info_get_cursor_screen_x(curr_visual),
             1,
-            A_REVERSE,
             0,
+            SEARCH_RESULT_PAIR,
             NULL
         );
 
@@ -122,18 +136,21 @@ static inline void highlight_text_in_area(WINDOW* window, const Text_box* main_b
         Cursor_info_get_cursor_screen_y(curr_visual),
         Cursor_info_get_cursor_screen_x(curr_visual),
         1,
-        A_REVERSE,
         0,
+        SEARCH_RESULT_PAIR,
         NULL
     );
 
     free(curr_visual);
+    if (misc_info & MISC_HAS_COLOR) {
+        attroff(COLOR_PAIR(SEARCH_RESULT_PAIR));
+    }
 }
 
-static inline void highlight_text_in_vis_area(WINDOW* window, const Text_box* main_box, size_t scroll_offset, size_t window_width, size_t end_last_displayed_line) {
+static inline void highlight_text_in_vis_area(WINDOW* window, const Text_box* main_box, size_t scroll_offset, size_t window_width, size_t end_last_displayed_line, MISC_INFO misc_info) {
     size_t vis_start = Text_box_get_visual_sel_start(main_box);
     size_t vis_end = Text_box_get_visual_sel_end(main_box);
-    highlight_text_in_area(window, main_box, vis_start, vis_end, scroll_offset, window_width, end_last_displayed_line);
+    highlight_text_in_area(window, main_box, vis_start, vis_end, scroll_offset, window_width, end_last_displayed_line, misc_info);
 }
 
 static inline bool highlight_search_result_if_nessessary(
@@ -142,7 +159,8 @@ static inline bool highlight_search_result_if_nessessary(
     const String* query,
     size_t scroll_offset,
     size_t window_width,
-    size_t end_last_displayed_line
+    size_t end_last_displayed_line,
+    MISC_INFO misc_info
 ) {
 
     if (text_box->string.count - text_box->cursor_info.pos.cursor < query->count) {
@@ -169,13 +187,14 @@ static inline bool highlight_search_result_if_nessessary(
         text_box->cursor_info.pos.cursor + query->count - 1,
         scroll_offset,
         window_width,
-        end_last_displayed_line
+        end_last_displayed_line,
+        misc_info
     );
 
     return true;
 }
 
-static void draw_window(Text_win* file_text, bool print_mvw_cursor, ED_STATE search_status, const String* query) {
+static void draw_window(Text_win* file_text, bool print_mvw_cursor, ED_STATE search_status, const String* query, MISC_INFO misc_info) {
     const Text_box* text_box = &file_text->text_box;
     WINDOW* nc_win = file_text->window;
 
@@ -228,7 +247,7 @@ static void draw_window(Text_win* file_text, bool print_mvw_cursor, ED_STATE sea
         break;
     case VIS_STATE_ON: 
         // highlight current visual area
-        highlight_text_in_vis_area(nc_win, text_box, scroll_offset, file_text->width, end_last_displayed_line);
+        highlight_text_in_vis_area(nc_win, text_box, scroll_offset, file_text->width, end_last_displayed_line, misc_info);
         break;
     default:
         log("internal error\n");
@@ -245,7 +264,8 @@ static void draw_window(Text_win* file_text, bool print_mvw_cursor, ED_STATE sea
             query,
             scroll_offset,
             file_text->width,
-            end_last_displayed_line
+            end_last_displayed_line,
+            misc_info
         );
     } break;
     default:
@@ -624,12 +644,6 @@ int main(int argc, char** argv) {
         do_tests();
 #   endif // DO_NO_TESTS
 
-    Editor* editor = Editor_get();
-
-    //set_escdelay(100);
-    parse_args(editor, argc, argv);
-    Editor_open_file(editor);
-
     if (!initscr()) {
         log("fetal error: initscr failed");
         abort();
@@ -641,14 +655,18 @@ int main(int argc, char** argv) {
     nl();
     refresh();
 
-    Editor_init_windows(editor);
+    Editor* editor = Editor_get();
 
-    Text_box_recalculate_visual_xy_and_scroll_offset(&editor->file_text.text_box, editor->file_text.width);
+    //set_escdelay(100);
+    parse_args(editor, argc, argv);
+    Editor_open_file(editor);
+    Editor_init_windows(editor);
 
     debug("thing size Text_box: %zu", sizeof(editor->file_text));
 
     bool should_close = false;
     bool should_resize_window = true;
+
     while (!should_close) {
 
         // draw
@@ -663,10 +681,10 @@ int main(int argc, char** argv) {
         }
 
         bool show_search_cursor = (editor->state == STATE_SEARCH);
-        draw_window(&editor->file_text, false, editor->state, &editor->search_query.text_box.string);
-        draw_window(&editor->general_info, false, editor->state, &editor->search_query.text_box.string);
-        draw_window(&editor->search_query, show_search_cursor, editor->state, &editor->search_query.text_box.string);
-        draw_window(&editor->save_info, false, editor->state, &editor->search_query.text_box.string);
+        draw_window(&editor->file_text, false, editor->state, &editor->search_query.text_box.string, editor->misc_info);
+        draw_window(&editor->general_info, false, editor->state, &editor->search_query.text_box.string, editor->misc_info);
+        draw_window(&editor->search_query, show_search_cursor, editor->state, &editor->search_query.text_box.string, editor->misc_info);
+        draw_window(&editor->save_info, false, editor->state, &editor->search_query.text_box.string, editor->misc_info);
 
         //if (editor->state == STATE_INSERT) {
             draw_cursor(editor->file_text.window, &editor->file_text.text_box);

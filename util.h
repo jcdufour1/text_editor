@@ -10,6 +10,8 @@
 #include <string.h>
 #include <stdio.h>
 
+#include <ncurses.h>
+
 static const char* LOG_FILE_NAME = "new_text_editor_log.txt";
 static const char* NO_CHANGES_TEXT = "no changes";
 static const char* UNSAVED_CHANGES_TEXT = "no changes";
@@ -24,6 +26,11 @@ static const char* SEARCH_FAILURE_TEXT = "[search]: no results. press ctrl-h for
 static const char* QUIT_CONFIRM_TEXT = "Are you sure that you want to exit without saving? N/y";
 
 static FILE* log_file;
+
+// color information (ncurses)
+static int SEARCH_RESULT_PAIR    =  1;
+#define SEARCH_RESULT_BACKGND_COLOR COLOR_GREEN
+#define SEARCH_RESULT_TEXT_COLOR    COLOR_BLACK
 
 #define GENERAL_INFO_HEIGHT    1
 #define SAVE_INFO_HEIGHT       1

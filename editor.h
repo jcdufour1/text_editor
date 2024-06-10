@@ -9,6 +9,9 @@ typedef enum {SEARCH_FIRST, SEARCH_REPEAT} SEARCH_STATUS;
 
 typedef enum {GEN_INFO_NORMAL, GEN_INFO_OLDEST_CHANGE, GEN_INFO_NEWEST_CHANGE} GEN_INFO_STATE;
 
+typedef uint32_t MISC_INFO;
+#define MISC_HAS_COLOR (1 << 0)
+
 typedef struct {
     int height;
     int width;
@@ -36,6 +39,8 @@ typedef struct {
     ED_STATE state;
     SEARCH_STATUS search_status;
     GEN_INFO_STATE gen_info_state;
+
+    MISC_INFO misc_info;
 } Editor;
 
 static inline void Text_win_init(Text_win* window) {
@@ -54,6 +59,7 @@ static inline void Editor_print_error(Editor* editor) {
 
 static inline void Editor_print_success(Editor* editor) {
     editor->unsaved_changes = false;
+    String_cpy_from_cstr(&editor->general_info.text_box.string, INSERT_TEXT, strlen(INSERT_TEXT));
     String_cpy_from_cstr(&editor->save_info.text_box.string, NO_CHANGES_TEXT, strlen(NO_CHANGES_TEXT));
     editor->file_text.text_box.cursor_info.pos.cursor = 0;
 }
@@ -181,6 +187,17 @@ static inline void Editor_init(Editor* editor) {
 
     Actions_init(&editor->actions);
     Actions_init(&editor->undo_actions);
+
+    // TODO: check for colors?
+    if (true) {
+        log("Will operate in 8 color mode");
+        editor->misc_info |= MISC_HAS_COLOR;
+        start_color();
+        init_pair(SEARCH_RESULT_PAIR, SEARCH_RESULT_TEXT_COLOR, SEARCH_RESULT_BACKGND_COLOR);
+    } else {
+        log("no colors are available");
+        SEARCH_RESULT_PAIR = 0;
+    }
 }
 
 static inline Editor* Editor_get() {
@@ -280,8 +297,6 @@ static bool Editor_save_file(const Editor* editor) {
     if (!actual_write(editor->file_name, editor->file_text.text_box.string.items, editor->file_text.text_box.string.count)) {
         return false;
     }
-
-    //if (0 > rename(temp_file_name, editor->file_name)) {
 
     return true;
 }
