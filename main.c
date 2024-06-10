@@ -36,9 +36,7 @@ static void draw_cursor(WINDOW* window, const Text_box* text_box) {
     wmove(window, screen_y, screen_x);
 }
 
-static inline void highlight_text_in_vis_area(WINDOW* window, const Text_box* main_box, size_t scroll_offset, size_t window_width, size_t end_last_displayed_line) {
-    size_t vis_start = Text_box_get_visual_sel_start(main_box);
-    size_t vis_end = Text_box_get_visual_sel_end(main_box);
+static inline void highlight_text_in_area(WINDOW* window, const Text_box* main_box, size_t vis_start, size_t vis_end, size_t scroll_offset, size_t window_width, size_t end_last_displayed_line) {
     debug(
         "VISUAL_PRINTING_THING: visual_sel_start: %zu; visual_sel_end: %zu; cursor: %zu; scroll_offset: %zu",
         vis_start,
@@ -132,7 +130,52 @@ static inline void highlight_text_in_vis_area(WINDOW* window, const Text_box* ma
     free(curr_visual);
 }
 
-static void draw_window(Text_win* file_text, bool print_mvw_cursor) {
+static inline void highlight_text_in_vis_area(WINDOW* window, const Text_box* main_box, size_t scroll_offset, size_t window_width, size_t end_last_displayed_line) {
+    size_t vis_start = Text_box_get_visual_sel_start(main_box);
+    size_t vis_end = Text_box_get_visual_sel_end(main_box);
+    highlight_text_in_area(window, main_box, vis_start, vis_end, scroll_offset, window_width, end_last_displayed_line);
+}
+
+static inline bool highlight_search_result_if_nessessary(
+    WINDOW* nc_win,
+    const Text_box* text_box,
+    const String* query,
+    size_t scroll_offset,
+    size_t window_width,
+    size_t end_last_displayed_line
+) {
+
+    if (text_box->string.count - text_box->cursor_info.pos.cursor < query->count) {
+        return false;
+    }
+
+    if (!String_substring_equals_string(
+        &text_box->string,
+        text_box->cursor_info.pos.cursor,
+        query->count,
+        query
+    )) {
+        return false;
+    }
+
+    if (query->count < 1) {
+        return false;
+    }
+
+    highlight_text_in_area(
+        nc_win,
+        text_box,
+        text_box->cursor_info.pos.cursor,
+        text_box->cursor_info.pos.cursor + query->count - 1,
+        scroll_offset,
+        window_width,
+        end_last_displayed_line
+    );
+
+    return true;
+}
+
+static void draw_window(Text_win* file_text, bool print_mvw_cursor, ED_STATE search_status, const String* query) {
     const Text_box* text_box = &file_text->text_box;
     WINDOW* nc_win = file_text->window;
 
@@ -180,17 +223,35 @@ static void draw_window(Text_win* file_text, bool print_mvw_cursor) {
         );
     }
 
-    //int64_t visual_x, visual_y;
     switch (text_box->visual_sel.state) {
     case VIS_STATE_NONE:
         break;
     case VIS_STATE_ON: 
+        // highlight current visual area
         highlight_text_in_vis_area(nc_win, text_box, scroll_offset, file_text->width, end_last_displayed_line);
         break;
     default:
         log("internal error\n");
         abort();
     }
+
+
+    // highlight search result if nessessary
+    switch (search_status) {
+    case STATE_SEARCH: {
+        highlight_search_result_if_nessessary(
+            nc_win,
+            text_box,
+            query,
+            scroll_offset,
+            file_text->width,
+            end_last_displayed_line
+        );
+    } break;
+    default:
+        break;
+    }
+    // highlight current search result
 
     // draw cursor
     if (print_mvw_cursor) {
@@ -602,10 +663,10 @@ int main(int argc, char** argv) {
         }
 
         bool show_search_cursor = (editor->state == STATE_SEARCH);
-        draw_window(&editor->file_text, false);
-        draw_window(&editor->general_info, false);
-        draw_window(&editor->search_query, show_search_cursor);
-        draw_window(&editor->save_info, false);
+        draw_window(&editor->file_text, false, editor->state, &editor->search_query.text_box.string);
+        draw_window(&editor->general_info, false, editor->state, &editor->search_query.text_box.string);
+        draw_window(&editor->search_query, show_search_cursor, editor->state, &editor->search_query.text_box.string);
+        draw_window(&editor->save_info, false, editor->state, &editor->search_query.text_box.string);
 
         //if (editor->state == STATE_INSERT) {
             draw_cursor(editor->file_text.window, &editor->file_text.text_box);
