@@ -98,6 +98,4 @@ static inline char String_at(const String* string, size_t index) {
     return string->items[index];
 }
 
-
-
 #endif // NEW_STRING_H
