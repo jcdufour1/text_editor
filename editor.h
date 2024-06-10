@@ -42,6 +42,57 @@ static inline void Text_win_init(Text_win* window) {
     memset(window, 0, sizeof(*window));
 }
 
+static inline void Editor_print_error(Editor* editor) {
+    log("error: could not open file %s: errno %d: %s\n", editor->file_name, errno, strerror(errno));
+    editor->unsaved_changes = false;
+    String_cpy_from_cstr(&editor->save_info.text_box.string, FILE_NOT_OPEN, strlen(FILE_NOT_OPEN));
+    const char* colon_space = ": ";
+    String_append_cstr(&editor->save_info.text_box.string, colon_space, strlen(colon_space));
+    String_append_cstr(&editor->save_info.text_box.string, strerror(errno), strlen(strerror(errno)));
+    editor->file_text.text_box.cursor_info.pos.cursor = 0;
+}
+
+static inline void Editor_print_success(Editor* editor) {
+    editor->unsaved_changes = false;
+    String_cpy_from_cstr(&editor->save_info.text_box.string, NO_CHANGES_TEXT, strlen(NO_CHANGES_TEXT));
+    editor->file_text.text_box.cursor_info.pos.cursor = 0;
+}
+
+// returns true if file opened successfully
+static inline bool Editor_open_file(Editor* editor) {
+    if (!editor->file_name) {
+        String_cpy_from_cstr(&editor->general_info.text_box.string, FILE_NOT_OPEN, strlen(FILE_NOT_OPEN));
+        return false;
+    }
+
+    if (0 != access(editor->file_name, R_OK)) {
+        Editor_print_error(editor);
+        return false;
+    }
+
+    if (0 != access(editor->file_name, F_OK)) {
+        log("note: creating new file %s\n", editor->file_name);
+        Editor_print_success(editor);
+        return true;
+    }
+
+    log("note: opening file %s\n", editor->file_name);
+    FILE* f = fopen(editor->file_name, "r");
+    //open(editor->file_name, O_RDONLY | O_CREAT);
+    if (!f) {
+        Editor_print_error(editor);
+        return false;
+    }
+    int curr_char = getc(f);
+    while (!feof(f)) {
+        Text_box_append(&editor->file_text.text_box, curr_char, 1000000, 10000000);
+        curr_char = getc(f);
+    }
+
+    Editor_print_success(editor);
+    return true;
+}
+
 static WINDOW* get_newwin(int height, int width, int starty, int startx) {
     WINDOW* new_window = newwin(height, width, starty, startx);
     if (!new_window) {

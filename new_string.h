@@ -42,6 +42,16 @@ static inline void String_insert_string(String* dest, size_t index, const String
     vector_insert_vector_char(dest, src, index);
 }
 
+static inline void String_insert_cstr(String* dest, size_t index_dest, const char* src, size_t len_src) {
+    for (size_t idx_src = 0; idx_src < len_src; idx_src++) {
+        vector_insert_char(dest, &src[idx_src], index_dest + idx_src);
+    }
+}
+
+static inline void String_append_cstr(String* dest, const char* src, size_t len_src) {
+    String_insert_cstr(dest, dest->count, src, len_src);
+}
+
 // String_init must be called before this function
 static inline void String_cpy_from_cstr(String* dest, const char* src, size_t src_size) {
     // empty dest

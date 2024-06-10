@@ -446,38 +446,11 @@ static void process_next_input(bool* should_resize_window, Editor* editor, bool*
 static void parse_args(Editor* editor, int argc, char** argv) {
     int curr_arg_idx = 1;
     if (curr_arg_idx > 2) {
-        assert(false && "not implemented");
+        todo("not implemented");
     }
     for (;curr_arg_idx < argc; curr_arg_idx++) {
-        if (0 != access(argv[curr_arg_idx], R_OK)) {
-            log("error: could not read file %s: errno %d: %s\n", argv[curr_arg_idx], errno, strerror(errno));
-            continue;
-        }
-
-        if (0 != access(argv[curr_arg_idx], F_OK)) {
-            log("note: creating new file %s\n", argv[curr_arg_idx]);
-            editor->file_name = argv[curr_arg_idx];
-            continue;
-        }
-
-        log("note: opening file %s\n", argv[curr_arg_idx]);
-        FILE* f = fopen(argv[curr_arg_idx], "r");
-        //open(argv[curr_arg_idx], O_RDONLY | O_CREAT);
-        if (!f) {
-            log("error: could not open file %s: errno %d: %s\n", argv[curr_arg_idx], errno, strerror(errno));
-            continue;
-        }
-        int curr_char = getc(f);
-        while (!feof(f)) {
-            Text_box_append(&editor->file_text.text_box, curr_char, 1000000, 10000000);
-            curr_char = getc(f);
-        }
-        fclose(f);
         editor->file_name = argv[curr_arg_idx];
     }
-    editor->unsaved_changes = false;
-    String_cpy_from_cstr(&editor->save_info.text_box.string, NO_CHANGES_TEXT, strlen(NO_CHANGES_TEXT));
-    editor->file_text.text_box.cursor_info.pos.cursor = 0;
 }
 
 void test_Text_box_scroll_if_nessessary(void) {
@@ -594,6 +567,7 @@ int main(int argc, char** argv) {
 
     //set_escdelay(100);
     parse_args(editor, argc, argv);
+    Editor_open_file(editor);
 
     if (!initscr()) {
         log("fetal error: initscr failed");
@@ -607,8 +581,6 @@ int main(int argc, char** argv) {
     refresh();
 
     Editor_init_windows(editor);
-
-    String_cpy_from_cstr(&editor->general_info.text_box.string, INSERT_TEXT, strlen(INSERT_TEXT));
 
     Text_box_recalculate_visual_xy_and_scroll_offset(&editor->file_text.text_box, editor->file_text.width);
 
