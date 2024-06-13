@@ -36,6 +36,7 @@ static void draw_cursor(WINDOW* window, const Text_box* text_box) {
     wmove(window, screen_y, screen_x);
 }
 
+
 static inline void highlight_text_in_area(
     WINDOW* window,
     const Text_box* main_box,
@@ -147,11 +148,13 @@ static inline void highlight_text_in_area(
     }
 }
 
+
 static inline void highlight_text_in_vis_area(WINDOW* window, const Text_box* main_box, size_t scroll_offset, size_t window_width, size_t end_last_displayed_line, MISC_INFO misc_info) {
     size_t vis_start = Text_box_get_visual_sel_start(main_box);
     size_t vis_end = Text_box_get_visual_sel_end(main_box);
     highlight_text_in_area(window, main_box, vis_start, vis_end, scroll_offset, window_width, end_last_displayed_line, misc_info);
 }
+
 
 static inline bool highlight_search_result_if_nessessary(
     WINDOW* nc_win,
@@ -193,6 +196,7 @@ static inline bool highlight_search_result_if_nessessary(
 
     return true;
 }
+
 
 static void draw_window(Text_win* file_text, bool print_mvw_cursor, ED_STATE search_status, const String* query, MISC_INFO misc_info) {
     const Text_box* text_box = &file_text->text_box;
@@ -281,6 +285,7 @@ static void draw_window(Text_win* file_text, bool print_mvw_cursor, ED_STATE sea
     // refresh windows
     wrefresh(nc_win);
 }
+
 
 static void process_next_input(bool* should_resize_window, Editor* editor, bool* should_close) {
     *should_resize_window = false;
@@ -520,9 +525,9 @@ static void process_next_input(bool* should_resize_window, Editor* editor, bool*
             String_cpy_from_cstr(&editor->general_info.text_box.string, INSERT_TEXT, strlen(INSERT_TEXT));
         } break;
     } break;
-
     }
 }
+
 
 static void parse_args(Editor* editor, int argc, char** argv) {
     int curr_arg_idx = 1;
@@ -534,6 +539,7 @@ static void parse_args(Editor* editor, int argc, char** argv) {
     }
 }
 
+
 void test_Text_box_scroll_if_nessessary(void) {
     Editor* editor = safe_malloc(sizeof(*editor));
     memset(editor, 0, sizeof(*editor));
@@ -543,6 +549,7 @@ void test_Text_box_scroll_if_nessessary(void) {
 
     free(editor);
 }
+
 
 #ifndef DO_NO_TESTS
 void test_template_Text_box_get_index_scroll_offset(const char* text, size_t scroll_y, size_t expected_offset) {
@@ -566,6 +573,7 @@ void test_template_Text_box_get_index_scroll_offset(const char* text, size_t scr
     free(text_box);
 }
 
+
 void test_Text_box_get_index_scroll_offset(void) {
     test_template_Text_box_get_index_scroll_offset("hello\nworld\n", 0, 0);
     test_template_Text_box_get_index_scroll_offset("hello\nworld\n", 1, 6);
@@ -579,6 +587,7 @@ void test_Text_box_get_index_scroll_offset(void) {
     test_template_Text_box_get_index_scroll_offset("\nhello\n\nworld\n", 2, 7);
     test_template_Text_box_get_index_scroll_offset("\nhello\n\nworld\n", 3, 8);
 }
+
 
 void test_template_get_index_start_next_line(const char* test_string, size_t index_before, size_t expected_result) {
     Pos_data result;
@@ -597,6 +606,7 @@ void test_template_get_index_start_next_line(const char* test_string, size_t ind
     assert(result.visual_x == 0);
     String_free_char_data(&test_text);
 }
+
 
 void test_get_index_start_next_line(void) {
     //get_index_start_next_line
@@ -627,11 +637,13 @@ void test_get_index_start_next_line(void) {
     test_template_get_index_start_next_line("\nhello\n\nt", 7, 8);
 }
 
+
 void do_tests(void) {
     test_get_index_start_next_line();
     test_Text_box_get_index_scroll_offset();
 }
 #endif // DO_NO_TESTS
+
 
 int main(int argc, char** argv) {
     log_file = fopen(LOG_FILE_NAME, "w");
@@ -712,4 +724,5 @@ int main(int argc, char** argv) {
 
     return 0;
 }
+
 

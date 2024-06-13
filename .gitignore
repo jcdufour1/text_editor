@@ -1,6 +1,16 @@
+# log and temp files
+new_text_editor_log.txt
 errors.txt
-notes.txt
-text_editor
-new_text_editor
 .temp_thingyksdjfaijdfkj.txt
+tmux-client-*.log
+
+# executables and shared objects
+new_text_editor
+*.a
+*.so
+
+# misc
 *~
+notes.txt
+exp/
+opt_txt/

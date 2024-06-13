@@ -1,12 +1,15 @@
 #ifndef ACTION_H
 #define ACTION_H
 
+
 #include <stddef.h>
 #include "new_string.h"
 #include "str_view.h"
 #include "util.h"
 
+
 typedef enum {ACTION_INSERT_STRING, ACTION_REMOVE_STRING} ACTION;
+
 
 typedef struct {
     size_t cursor; // start of area to insert/delete substr
@@ -14,11 +17,13 @@ typedef struct {
     String str;
 } Action;
 
+
 typedef struct {
     Action* items;
     size_t capacity;
     size_t count;
 } Actions;
+
 
 static void Actions_insert(Actions* actions, const Action* new_action, size_t index) {
     assert(index <= actions->count);
@@ -40,9 +45,11 @@ static void Actions_insert(Actions* actions, const Action* new_action, size_t in
     actions->count++;
 }
 
+
 static void Actions_append(Actions* actions, const Action* new_ch) {
     Actions_insert(actions, new_ch, actions->count);
 }
+
 
 static bool Actions_del(Actions* actions, size_t index) {
     assert(index < actions->count);
@@ -50,6 +57,7 @@ static bool Actions_del(Actions* actions, size_t index) {
     actions->count--;
     return true;
 }
+
 
 static void Actions_pop(Action* popped_item, Actions* actions) {
     assert(actions->count > 0);
@@ -59,9 +67,11 @@ static void Actions_pop(Action* popped_item, Actions* actions) {
     Actions_del(actions, actions->count - 1);
 }
 
+
 static void Actions_init(Actions* actions) {
     memset(actions, 0, sizeof(*actions));
 }
+
 
 static void Actions_free(Actions* actions) {
     if (!actions->items || actions->capacity < 1) {
@@ -74,5 +84,6 @@ static void Actions_free(Actions* actions) {
     free(actions->items);
     memset(actions, 0, sizeof(*actions));
 }
+
 
 #endif // ACTION_H

@@ -1,15 +1,16 @@
 #ifndef TEXT_BOX_H
 #define TEXT_BOX_H
 
+
 #include "str_view.h"
 #include "util.h"
 #include "new_string.h"
 
+
 typedef enum {DIR_UP, DIR_DOWN, DIR_RIGHT, DIR_LEFT} DIRECTION;
-
 typedef enum {STATE_INSERT = 0, STATE_COMMAND, STATE_SEARCH, STATE_QUIT_CONFIRM} ED_STATE;
-
 typedef enum {VIS_STATE_NONE = 0, VIS_STATE_ON} VISUAL_STATE;
+
 
 typedef struct {
     VISUAL_STATE state;
@@ -23,6 +24,7 @@ typedef struct {
 
 // an actual line is a line that is delimiated only by /n or /n/r line ending
 
+
 typedef struct {
     size_t cursor; // absolute cursor position
 
@@ -32,6 +34,7 @@ typedef struct {
                      // (0 means that the cursor is on the first line of visual text)
 } Pos_data;
 
+
 typedef struct {
     size_t offset; // absolute position of the first character that appears on the screen
     size_t x; // amount right that the text is scrolled to the right (not in terms of screen)
@@ -39,10 +42,12 @@ typedef struct {
     size_t user_max_col; // column that cursor should be if possible
 } Scroll_data;
 
+
 typedef struct {
     Pos_data pos;
     Scroll_data scroll;
 } Cursor_info;
+
 
 typedef struct {
     String string; // actual text
@@ -52,19 +57,23 @@ typedef struct {
     Visual_selected visual_sel; // visually selected area
 } Text_box;
 
+
 static inline Cursor_info* Cursor_info_get(void) {
     Cursor_info* info = safe_malloc(sizeof(*info));
     memset(info, 0, sizeof(*info));
     return info;
 }
 
+
 static inline void Cursor_info_init(Cursor_info* cursor_info) {
     memset(cursor_info, 0, sizeof(*cursor_info));
 }
 
+
 static inline void Visual_selected_init(Visual_selected* visual_selected) {
     memset(visual_selected, 0, sizeof(*visual_selected));
 }
+
 
 static inline void Text_box_init(Text_box* text_box) {
     memset(text_box, 0, sizeof(*text_box));
@@ -74,6 +83,7 @@ static inline void Text_box_init(Text_box* text_box) {
     Visual_selected_init(&text_box->visual_sel);
 }
 
+
 static inline void Text_box_free(Text_box* text_box) {
     if (!text_box) {
         return;
@@ -82,17 +92,21 @@ static inline void Text_box_free(Text_box* text_box) {
     String_free_char_data(&text_box->string);
 }
 
+
 static inline void Cursor_info_cpy(Cursor_info* dest, const Cursor_info* src) {
     *dest = *src;
 }
+
 
 static inline void Pos_data_cpy(Pos_data* dest, const Pos_data* src) {
     *dest = *src;
 }
 
+
 static inline int Text_box_at(const Text_box* text, size_t cursor) {
     return String_at(&text->string, cursor);
 }
+
 
 typedef enum {
     CUR_DEC_NORMAL, // nothing interesting has happened
@@ -105,6 +119,7 @@ typedef enum {
     // misc error
     CUR_DEC_ERROR
 } CUR_DECRE_STATUS;
+
 
 typedef enum {
     CUR_ADV_NORMAL, // nothing interesting has happened
@@ -122,6 +137,7 @@ static inline CUR_ADVANCE_STATUS Pos_data_advance_one(
     const String* string,
     size_t max_visual_width,
     bool is_visual
+
 ) {
     if (curr_pos->cursor >= string->count) {
         // no more lines are remaining
@@ -172,6 +188,7 @@ static inline CUR_ADVANCE_STATUS Pos_data_advance_one(
     return CUR_ADV_NORMAL;
 }
 
+
 static inline void Pos_data_move_to_start_of_file(Pos_data* pos) {
     pos->cursor = 0;
     pos->visual_x = 0;
@@ -184,6 +201,7 @@ static inline CUR_DECRE_STATUS Pos_data_decrement_one(
     const String* string,
     size_t max_visual_width,
     bool is_visual
+
 ) {
 
     /*
@@ -433,6 +451,7 @@ static inline bool get_start_next_actual_line_from_curr_cursor(
     );
 }
 
+
 static inline void debug_print_chars_near_cursor(const String* string, size_t cursor) {
     size_t amt_thing = 5;
     for (size_t idx = MIN(amt_thing - 1, cursor); idx > 0; idx--) {    
@@ -624,21 +643,25 @@ static inline void cal_start_generic_line_internal(
     *result = prev_cursor;
 }
 
+
 static inline size_t cal_start_visual_line(const String* string, size_t cursor, size_t max_visual_width) {
     Pos_data line_data;
     cal_start_generic_line_internal(&line_data, string, cursor, max_visual_width, false, true);
     return line_data.cursor;
 }
 
+
 static inline size_t cal_visual_x_at_cursor(const String* string, size_t cursor, size_t max_visual_width) {
     return cursor - cal_start_visual_line(string, cursor, max_visual_width);
 }
+
 
 static inline size_t cal_visual_y_at_cursor(const String* string, size_t cursor, size_t max_visual_width) {
     Pos_data line_data;
     cal_start_generic_line_internal(&line_data, string, cursor, max_visual_width, false, true);
     return line_data.visual_y;
 }
+
 
 static inline size_t cal_start_next_visual_line(const String* string, size_t cursor, size_t max_visual_width) {
     size_t curr_cursor = cal_start_visual_line(string, cursor, max_visual_width);
@@ -653,20 +676,6 @@ static inline size_t cal_start_next_visual_line(const String* string, size_t cur
     return cal_start_visual_line(string, curr_cursor, max_visual_width);
 }
 
-/*
-static inline size_t get_start_next_actual_line(const Text_box* text, size_t cursor) {
-    size_t curr_cursor = get_absol_start_actual_line(text, cursor);
-
-    if (curr_cursor < 1) {
-        assert(false && "cursor is already at topmost line");
-    }
-
-    // put cursor at \n or \n\r characters at end of current line
-    curr_cursor++;
-
-    return get_absol_start_actual_line(text, curr_cursor);
-}
-*/
 
 static inline size_t cal_start_prev_visual_line(const String* string, size_t cursor, size_t max_visual_width) {
     size_t curr_cursor = cal_start_visual_line(string, cursor, max_visual_width);
@@ -681,6 +690,7 @@ static inline size_t cal_start_prev_visual_line(const String* string, size_t cur
     return cal_start_visual_line(string, curr_cursor, max_visual_width);
 
 }
+
 
 // calculate absolute index of where cursor should be if scrolled down <scroll_y> visual lines
 static inline void Text_box_cal_index_scroll_offset(
@@ -706,11 +716,13 @@ static inline void Text_box_cal_index_scroll_offset(
     *result = curr_cursor.cursor;
 }
 
+
 // get x coordinate of cursor on screen
 static inline size_t Cursor_info_get_cursor_screen_x(const Cursor_info* cursor_info) {
     assert(cursor_info->pos.visual_x >= cursor_info->scroll.x);
     return cursor_info->pos.visual_x - cursor_info->scroll.x;
 }
+
 
 // get y coordinate of cursor on screen
 static inline size_t Cursor_info_get_cursor_screen_y(const Cursor_info* cursor_info) {
@@ -718,13 +730,16 @@ static inline size_t Cursor_info_get_cursor_screen_y(const Cursor_info* cursor_i
     return cursor_info->pos.visual_y - cursor_info->scroll.y;
 }
 
+
 static inline size_t cal_cur_screen_x_at_cursor(const Text_box* text_box) {
     return Cursor_info_get_cursor_screen_x(&text_box->cursor_info);
 }
 
+
 static inline size_t cal_cur_screen_y_at_cursor(const Text_box* text_box) {
     return Cursor_info_get_cursor_screen_y(&text_box->cursor_info);
 }
+
 
 static inline void Text_box_recalculate_visual_xy_and_scroll_offset(Text_box* text_box, size_t max_visual_width) {
     text_box->cursor_info.pos.visual_x = cal_visual_x_at_cursor(&text_box->string, text_box->cursor_info.pos.cursor, max_visual_width);
@@ -737,6 +752,7 @@ static inline void Text_box_recalculate_visual_xy_and_scroll_offset(Text_box* te
     Text_box_cal_index_scroll_offset(&new_scroll_offset, &text_box->cursor_info.scroll, &text_box->string, max_visual_width);
     text_box->cursor_info.scroll.offset = new_scroll_offset;
 }
+
 
 static inline void Scroll_data_scroll_screen_down_one(Scroll_data* scroll, const Pos_data* pos, const String* string, size_t max_visual_width, size_t max_visual_height) {
 
@@ -771,6 +787,7 @@ static inline void Scroll_data_scroll_screen_down_one(Scroll_data* scroll, const
     }
 }
 
+
 static inline void Scroll_data_scroll_screen_up_one(Scroll_data* scroll, const Pos_data* pos, const String* string, size_t max_visual_width) {
     if (pos->visual_y >= scroll->y) {
         // do not scroll screen
@@ -792,6 +809,7 @@ static inline void Scroll_data_scroll_screen_up_one(Scroll_data* scroll, const P
         scroll->offset = pos_at_new_scroll_offset.cursor;
     }
 }
+
 
 static inline void Cursor_info_move_cursor_right(Cursor_info* cursor_info, const String* string, size_t max_visual_width, size_t max_visual_height, bool wrap) {
     CUR_ADVANCE_STATUS status = Pos_data_advance_one(&cursor_info->pos, string, max_visual_width, true);
@@ -820,6 +838,7 @@ static inline void Cursor_info_move_cursor_right(Cursor_info* cursor_info, const
         abort();
     }
 }
+
 
 static inline void Cursor_info_move_cursor_to_end_of_file(
     Cursor_info* cursor_info,
@@ -882,6 +901,7 @@ static inline void Cursor_info_move_cursor_left(
         abort();
     }
 }
+
 
 static inline void Cursor_info_move_cursor_up(
     Cursor_info* cursor_info,
@@ -976,6 +996,7 @@ static inline void Cursor_info_move_cursor_up(
 
 }
 
+
 static inline void Cursor_info_move_cursor_down(Cursor_info* cursor_info, const String* string, size_t max_visual_width, size_t max_visual_height) {
     //debug("DIR_DOWN before: cursor_screen_y: %zu", Text_box_get_cursor_screen_y(text_box));
 
@@ -992,9 +1013,9 @@ static inline void Cursor_info_move_cursor_down(Cursor_info* cursor_info, const 
         abort();
     }
 
-#ifdef DO_EXTRA_CHECKS
-    assert(start_curr_line == cal_start_visual_line(text_box, text_box->cursor, max_visual_width));
-#endif
+#   ifdef DO_EXTRA_CHECKS
+        assert(start_curr_line == cal_start_visual_line(text_box, text_box->cursor, max_visual_width));
+#   endif
     //print_chars_near_cursor(text_box, start_curr_line);
 
     size_t start_2next_line;
@@ -1091,6 +1112,7 @@ static inline void Text_box_move_cursor(
     }
 }
 
+
 static inline bool Text_box_del_ch(Text_box* text_box, size_t index, size_t max_visual_width, size_t max_visual_height) {
     if (text_box->string.count < 1) {
         return false;
@@ -1101,6 +1123,7 @@ static inline bool Text_box_del_ch(Text_box* text_box, size_t index, size_t max_
 
     return String_del(&text_box->string, index);
 }
+
 
 static inline bool Text_box_del_substr(Text_box* text_box, size_t index_start, size_t count_to_del) {
     if (text_box->string.count < 1) {
@@ -1120,15 +1143,18 @@ static inline bool Text_box_del_substr(Text_box* text_box, size_t index_start, s
     return true;
 }
 
+
 static inline void Text_box_insert_ch(Text_box* text_box, int new_ch, size_t index, size_t max_visual_width, size_t max_visual_height) {
     assert(index <= text_box->string.count && "out of bounds");
     String_insert(&text_box->string, new_ch, index);
     Text_box_move_cursor(text_box, DIR_RIGHT, max_visual_width, max_visual_height, false);
 }
 
+
 static inline void Text_box_append(Text_box* text, int new_ch, size_t max_visual_width, size_t max_visual_height) {
     Text_box_insert_ch(text, new_ch, text->string.count, max_visual_width, max_visual_height);
 }
+
 
 static inline void Text_box_insert_substr(Text_box* text_box, const String* new_str, size_t index_start, size_t max_visual_width, size_t max_visual_height) {
     for (size_t idx = new_str->count - 1; idx > 0; idx--) {
@@ -1138,6 +1164,7 @@ static inline void Text_box_insert_substr(Text_box* text_box, const String* new_
     debug("YES YES thing bottom");
     Text_box_insert_ch(text_box, String_at(new_str, 0), index_start, max_visual_width, max_visual_height);
 }
+
 
 // returns true if substring equals needle
 static inline bool String_substring_equals_string(
@@ -1154,6 +1181,7 @@ static inline bool String_substring_equals_string(
     }
     return true;
 }
+
 
 // text box should be unchanged in this function if this function returns false
 // text box should be unchanged in this function (except for cursor related info) if this function returns true
@@ -1216,6 +1244,7 @@ static inline bool Text_box_perform_search_internal(
     return false;
 }
 
+
 static inline bool Text_box_do_search(
     Text_box* text_box_to_search,
     const String* query,
@@ -1235,6 +1264,7 @@ static inline bool Text_box_do_search(
     return true;
 }
 
+
 static inline void Text_box_toggle_visual_mode(Text_box* text_box) {
     switch (text_box->visual_sel.state) {
         case VIS_STATE_NONE:
@@ -1249,6 +1279,7 @@ static inline void Text_box_toggle_visual_mode(Text_box* text_box) {
             abort();
     }
 }
+
 
 typedef enum {
     STATUS_LAST_LINE_ERROR,
@@ -1292,6 +1323,7 @@ static inline STATUS_GET_LAST_LINE get_end_last_displayed_visual_line_from_curso
     return STATUS_LAST_LINE_SUCCESS;
 }
 
+
 static size_t Text_box_get_visual_sel_start(const Text_box* text_box) {
     if (text_box->visual_sel.cursor_started < text_box->cursor_info.pos.cursor) {
         return text_box->visual_sel.cursor_started;
@@ -1299,11 +1331,13 @@ static size_t Text_box_get_visual_sel_start(const Text_box* text_box) {
     return text_box->cursor_info.pos.cursor;
 }
 
+
 static size_t Text_box_get_visual_sel_end(const Text_box* text_box) {
     if (text_box->visual_sel.cursor_started < text_box->cursor_info.pos.cursor) {
         return text_box->cursor_info.pos.cursor;
     }
     return text_box->visual_sel.cursor_started;
 }
+
 
 #endif // TEXT_BOX_H

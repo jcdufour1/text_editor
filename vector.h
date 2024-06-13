@@ -1,6 +1,7 @@
 #ifndef VECTOR_H
 #define VECTOR_H
 
+
 #define define_vector(type) \
     typedef struct { \
         size_t count; \
@@ -91,6 +92,7 @@
     static inline void vector_pop_##type(type* popped_item, Vector_##type* vector) { \
         vector_remove_##type(popped_item, vector, vector->count - 1); \
     } \
+
 
 #endif // VECTOR_H
 

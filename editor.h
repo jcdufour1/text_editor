@@ -1,16 +1,19 @@
 #ifndef EDITOR_H
 #define EDITOR_H
 
+
 #include "text_box.h"
 #include "action.h"
 #include <ncurses.h>
 
-typedef enum {SEARCH_FIRST, SEARCH_REPEAT} SEARCH_STATUS;
 
+typedef enum {SEARCH_FIRST, SEARCH_REPEAT} SEARCH_STATUS;
 typedef enum {GEN_INFO_NORMAL, GEN_INFO_OLDEST_CHANGE, GEN_INFO_NEWEST_CHANGE} GEN_INFO_STATE;
+
 
 typedef uint32_t MISC_INFO;
 #define MISC_HAS_COLOR (1 << 0)
+
 
 typedef struct {
     int height;
@@ -18,6 +21,7 @@ typedef struct {
     WINDOW* window;
     Text_box text_box;
 } Text_win;
+
 
 typedef struct {
     int total_height;
@@ -43,9 +47,11 @@ typedef struct {
     MISC_INFO misc_info;
 } Editor;
 
+
 static inline void Text_win_init(Text_win* window) {
     memset(window, 0, sizeof(*window));
 }
+
 
 static inline void Editor_print_error(Editor* editor) {
     log("error: could not open file %s: errno %d: %s\n", editor->file_name, errno, strerror(errno));
@@ -57,12 +63,14 @@ static inline void Editor_print_error(Editor* editor) {
     editor->file_text.text_box.cursor_info.pos.cursor = 0;
 }
 
+
 static inline void Editor_print_success(Editor* editor) {
     editor->unsaved_changes = false;
     String_cpy_from_cstr(&editor->general_info.text_box.string, INSERT_TEXT, strlen(INSERT_TEXT));
     String_cpy_from_cstr(&editor->save_info.text_box.string, NO_CHANGES_TEXT, strlen(NO_CHANGES_TEXT));
     editor->file_text.text_box.cursor_info.pos.cursor = 0;
 }
+
 
 // returns true if file opened successfully
 static inline bool Editor_open_file(Editor* editor) {
@@ -99,6 +107,7 @@ static inline bool Editor_open_file(Editor* editor) {
     return true;
 }
 
+
 static WINDOW* get_newwin(int height, int width, int starty, int startx) {
     WINDOW* new_window = newwin(height, width, starty, startx);
     if (!new_window) {
@@ -110,6 +119,7 @@ static WINDOW* get_newwin(int height, int width, int starty, int startx) {
     wrefresh(new_window);
     return new_window;
 }
+
 
 static inline void Editor_set_window_coordinates(Editor* editor) {
     getmaxyx(stdscr, editor->total_height, editor->total_width);
@@ -127,6 +137,7 @@ static inline void Editor_set_window_coordinates(Editor* editor) {
     editor->save_info.height = SAVE_INFO_HEIGHT;
     editor->save_info.width = editor->total_width;
 }
+
 
 static void Editor_do_resize(Editor* editor) {
     Editor_set_window_coordinates(editor);
@@ -151,6 +162,7 @@ static void Editor_do_resize(Editor* editor) {
     assert(curr_y == editor->total_height - 1);
 }
 
+
 static inline void Editor_init_windows(Editor* editor) {
     Editor_set_window_coordinates(editor);
     editor->file_text.window = get_newwin(editor->file_text.height, editor->file_text.width, 0, 0);
@@ -174,6 +186,7 @@ static inline void Editor_init_windows(Editor* editor) {
         abort();
     }
 }
+
 
 static inline void Editor_init(Editor* editor) {
     memset(editor, 0, sizeof(*editor));
@@ -200,16 +213,19 @@ static inline void Editor_init(Editor* editor) {
     }
 }
 
+
 static inline Editor* Editor_get() {
     Editor* editor = safe_malloc(sizeof(*editor));
     Editor_init(editor);
     return editor;
 }
 
+
 static inline void Text_win_free(Text_win* window) {
     Text_box_free(&window->text_box);
     delwin(window->window);
 }
+
 
 static void Editor_free(Editor* editor) {
     Actions_free(&editor->actions);
@@ -222,6 +238,7 @@ static void Editor_free(Editor* editor) {
 
     String_free_char_data(&editor->clipboard);
 }
+
 
 static void Editor_undo(Editor* editor, size_t max_visual_width, size_t max_visual_height) {
     Action action_to_undo;
@@ -257,6 +274,7 @@ static void Editor_undo(Editor* editor, size_t max_visual_width, size_t max_visu
     Text_box_recalculate_visual_xy_and_scroll_offset(&editor->file_text.text_box, max_visual_width);
 }
 
+
 static void Editor_redo(Editor* editor, size_t max_visual_width, size_t max_visual_height) {
     Action action_to_redo;
     Actions_pop(&action_to_redo, &editor->undo_actions);
@@ -282,6 +300,7 @@ static void Editor_redo(Editor* editor, size_t max_visual_width, size_t max_visu
     Text_box_recalculate_visual_xy_and_scroll_offset(&editor->file_text.text_box, max_visual_width);
 }
 
+
 static bool Editor_save_file(const Editor* editor) {
     // TODO: confirm that temp_file_name does not already exist
     // TODO: make actual name for temp file
@@ -301,6 +320,7 @@ static bool Editor_save_file(const Editor* editor) {
     return true;
 }
 
+
 static void Editor_save(Editor* editor) {
     if (!editor->unsaved_changes) {
         return;
@@ -317,6 +337,7 @@ static void Editor_save(Editor* editor) {
     editor->unsaved_changes = false;
 }
 
+
 static void Editor_cpy_selection(Editor* editor) {
     size_t start = Text_box_get_visual_sel_start(&editor->file_text.text_box);
     size_t end = Text_box_get_visual_sel_end(&editor->file_text.text_box);
@@ -328,6 +349,7 @@ static void Editor_cpy_selection(Editor* editor) {
         end + 1 - start
     );
 }
+
 
 static void Editor_paste_selection(Editor* editor) {
     // insert text
@@ -342,6 +364,7 @@ static void Editor_paste_selection(Editor* editor) {
     String_cpy(&new_action.str, &editor->clipboard);
     Actions_append(&editor->actions, &new_action);
 }
+
 
 static void Editor_insert_into_main_file_text(Editor* editor, const String* new_str, size_t index, size_t max_visual_width, size_t max_visual_height) {
     if (!editor->unsaved_changes) {
@@ -369,6 +392,7 @@ static void Editor_insert_into_main_file_text(Editor* editor, const String* new_
         abort();
     }
 }
+
 
 static void Editor_del_main_file_text(Editor* editor, size_t max_visual_width, size_t max_visual_height) {
     Action new_action = {
@@ -402,5 +426,6 @@ static void Editor_del_main_file_text(Editor* editor, size_t max_visual_width, s
         abort();
     }
 }
+
 
 #endif // EDITOR_H
