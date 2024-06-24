@@ -3,16 +3,32 @@
 This is a text editor for unix-like systems, written in c.
 
 ## build
-### dependencies
-- ncurses
+### Install dependencies
+Debian/Ubuntu based distributions:
+```
+$ sudo apt-get update
+$ sudo apt-get install ncurses-dev gcc make
+```
 
-### release build
+Fedora based distributions:
 ```
-$ make build_release
+$ sudo dnf install ncurses-devel gcc make
 ```
-### debug build
+
+### clone and build
+clone this repo:
 ```
-$ make
+$ git clone https://github.com/jcdufour1/text_editor.git
+```
+
+change to the project directory:
+```
+$ cd text_editor/
+```
+
+build:
+```
+$ make build
 ```
 
 ## how to use
@@ -42,3 +58,11 @@ $ ./new_text_editor <file_to_edit>
 - save: s or ctrl-S
 - quit: q
 
+## Other information
+### dependencies
+- ncurses
+
+### to build with optimizations:
+```
+$ make build_release
+```
