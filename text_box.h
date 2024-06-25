@@ -201,7 +201,6 @@ static inline CUR_DECRE_STATUS Pos_data_decrement_one(
     const String* string,
     size_t max_visual_width,
     bool is_visual
-
 ) {
 
     /*
@@ -300,6 +299,7 @@ static inline CUR_DECRE_STATUS Pos_data_decrement_one(
     return CUR_DEC_NORMAL;
 }
 
+
 static inline bool get_start_next_generic_line_from_curr_cursor_x_pos(
     Pos_data* result,
     const String* string,
@@ -307,7 +307,6 @@ static inline bool get_start_next_generic_line_from_curr_cursor_x_pos(
     size_t max_visual_width,
     bool is_visual
 ) {
-
     // find next newline
     Pos_data curr_pos = *init_pos;
     while (1) {
@@ -1067,6 +1066,7 @@ static inline void Cursor_info_move_cursor_down(Cursor_info* cursor_info, const 
     //debug("end DIR_DOWN: len_next
 }
 
+
 static inline void Text_box_move_cursor(
     Text_box* text_box,
     DIRECTION direction,
@@ -1252,16 +1252,13 @@ static inline bool Text_box_do_search(
     size_t max_visual_width,
     size_t max_visual_height
 ) {
-    //size_t result;
-    if (!Text_box_perform_search_internal(text_box_to_search, query, search_direction, max_visual_width, max_visual_height)) {
-        return false;
-    }
-
-    //debug("result: %zu; query: %s", result, query->items);
-    //text_box_to_search->cursor_info.pos.cursor = result;
-    //Text_box_recalculate_visual_xy_and_scroll_offset(text_box_to_search, max_visual_width);
-
-    return true;
+    return Text_box_perform_search_internal(
+        text_box_to_search,
+        query,
+        search_direction,
+        max_visual_width,
+        max_visual_height
+    );
 }
 
 
@@ -1286,6 +1283,7 @@ typedef enum {
     STATUS_LAST_LINE_END_BUFFER,
     STATUS_LAST_LINE_SUCCESS,
 } STATUS_GET_LAST_LINE;
+
 
 static inline STATUS_GET_LAST_LINE get_end_last_displayed_visual_line_from_cursor(
     size_t* count_lines_actually_displayed,

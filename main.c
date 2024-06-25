@@ -67,19 +67,10 @@ static inline void highlight_text_in_area(
     // highlight area between visual_start and cursor position (inclusive)
     Cursor_info_cpy(curr_visual, &main_box->cursor_info);
     
-    debug("visual_print_thing 34: curr_visual->scroll.scroll_offset: %zu", curr_visual->scroll.offset);
+    // move curr_visual to the start of the highlighted area
+    debug("visual_print_thing 34: curr_visual->scroll.scroll_offset: %zu; vis_start: %zu; vis_end: %zu", curr_visual->scroll.offset, vis_start, vis_end);
     while (curr_visual->pos.cursor > vis_start && curr_visual->pos.cursor > scroll_offset) {
-        debug("highlight thing 1: y: %zu; x: %zu", curr_visual->pos.visual_y, curr_visual->pos.visual_x);
-        mvwchgat(
-            window,
-            Cursor_info_get_cursor_screen_y(curr_visual),
-            Cursor_info_get_cursor_screen_x(curr_visual),
-            1,
-            0,
-            SEARCH_RESULT_PAIR,
-            NULL
-        );
-
+        debug("highlight thing 1: y: %zu; x: %zu; cursor: %zu", curr_visual->pos.visual_y, curr_visual->pos.visual_x, curr_visual->pos.cursor);
         CUR_DECRE_STATUS status = Pos_data_decrement_one(&curr_visual->pos, &main_box->string, window_width, true);
         switch (status) {
         case CUR_DEC_NORMAL:
@@ -96,18 +87,8 @@ static inline void highlight_text_in_area(
             break;
         }
     }
-    mvwchgat(
-        window,
-        Cursor_info_get_cursor_screen_y(curr_visual),
-        Cursor_info_get_cursor_screen_x(curr_visual),
-        1,
-        0,
-        SEARCH_RESULT_PAIR,
-        NULL
-    );
 
-    // highlight area between cursor position (exclusive) and visual_end (inclusive)
-    Cursor_info_cpy(curr_visual, &main_box->cursor_info);
+    // highlight area between visual_start and visual_end (inclusive)
     while (curr_visual->pos.cursor < vis_end && curr_visual->pos.cursor < end_last_displayed_line) {
         debug("highlight thing 2: y: %zu; x: %zu", curr_visual->pos.visual_y, curr_visual->pos.visual_x);
         mvwchgat(

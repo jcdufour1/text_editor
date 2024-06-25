@@ -17,6 +17,7 @@ static const char* LOG_FILE_NAME = "new_text_editor_log.txt";
 static const char* NO_CHANGES_TEXT = "no changes";
 static const char* UNSAVED_CHANGES_TEXT = "no changes";
 static const char* FILE_NOT_OPEN = "file could not be opened";
+static const char* FILE_NAME_NOT_SPECIFIED = "file name not specified";
 static const char* INSERT_TEXT = "[insert]: press ctrl-I to enter command mode or exit";
 static const char* COMMAND_TEXT = "[command]: press q to quit. press ctrl-I to go back to insert mode";
 static const char* SEARCH_TEXT = "[search]: press ctrl-f to go to insert mode; "

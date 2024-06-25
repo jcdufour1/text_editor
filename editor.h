@@ -75,7 +75,7 @@ static inline void Editor_print_success(Editor* editor) {
 // returns true if file opened successfully
 static inline bool Editor_open_file(Editor* editor) {
     if (!editor->file_name) {
-        String_cpy_from_cstr(&editor->general_info.text_box.string, FILE_NOT_OPEN, strlen(FILE_NOT_OPEN));
+        String_cpy_from_cstr(&editor->general_info.text_box.string, FILE_NAME_NOT_SPECIFIED, strlen(FILE_NAME_NOT_SPECIFIED));
         return false;
     }
 
