@@ -26,6 +26,7 @@
 
 // TODO: make way to pipe text into grep and jump to result, similar to :grep in vim
 
+
 static void draw_cursor(WINDOW* window, const Text_box* text_box) {
     if (text_box->cursor_info.scroll.x > 0) {
         assert(false && "not implemented");
@@ -50,7 +51,6 @@ static inline void highlight_text_in_area(
     if (misc_info & MISC_HAS_COLOR) {
         attron(COLOR_PAIR(SEARCH_RESULT_PAIR));
     }
-    //mvaddch(y, x, PLAYER);
 
     debug(
         "VISUAL_PRINTING_THING: visual_sel_start: %zu; visual_sel_end: %zu; cursor: %zu; scroll_offset: %zu",
@@ -59,8 +59,6 @@ static inline void highlight_text_in_area(
         main_box->cursor_info.pos.cursor,
         scroll_offset
     );
-    //Text_box curr_visual_box_view;
-    //Text_box_get_view_from_other(&curr_visual_box, &main_box);
 
     Cursor_info* curr_visual = Cursor_info_get();
 
@@ -256,7 +254,6 @@ static void draw_window(Text_win* file_text, bool print_mvw_cursor, ED_STATE sea
     default:
         break;
     }
-    // highlight current search result
 
     // draw cursor
     if (print_mvw_cursor) {
